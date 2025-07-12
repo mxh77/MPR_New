@@ -1,42 +1,61 @@
 /**
- * Écran de connexion
+ * Écran de connexion avec nouveaux composants
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
-import { useAuth, useTheme } from '../../contexts';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../components/navigation/AuthNavigator';
 
+import { useAuth, useTheme } from '../../contexts';
+import { useForm } from '../../hooks';
+import { Button, Input } from '../../components/common';
+
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
   const { login } = useAuth();
   const { theme } = useTheme();
   const navigation = useNavigation<LoginScreenNavigationProp>();
 
+  // Utilisation du hook useForm avec validation
+  const { formState, updateField, validateForm, isFormValid } = useForm(
+    { email: '', password: '' },
+    {
+      email: {
+        required: true,
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        custom: (value) => {
+          if (!value.includes('@')) return 'Email invalide';
+          return undefined;
+        },
+      },
+      password: {
+        required: true,
+        minLength: 6,
+      },
+    }
+  );
+
+  const [isLoading, setIsLoading] = React.useState(false);
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+    if (!validateForm()) {
+      Alert.alert('Erreur', 'Veuillez corriger les erreurs dans le formulaire');
       return;
     }
 
     setIsLoading(true);
     try {
-      await login(email, password);
+      await login(formState.email.value, formState.password.value);
     } catch (error) {
       Alert.alert('Erreur de connexion', 'Email ou mot de passe incorrect');
     } finally {
@@ -55,7 +74,7 @@ export const LoginScreen: React.FC = () => {
       paddingHorizontal: 24,
     },
     title: {
-      fontSize: 28,
+      fontSize: 32,
       fontWeight: 'bold',
       color: theme.colors.text,
       textAlign: 'center',
@@ -65,106 +84,90 @@ export const LoginScreen: React.FC = () => {
       fontSize: 16,
       color: theme.colors.textSecondary,
       textAlign: 'center',
-      marginBottom: 32,
+      marginBottom: 40,
     },
-    input: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      fontSize: 16,
-      color: theme.colors.text,
-      backgroundColor: theme.colors.surface,
-      marginBottom: 16,
-    },
-    button: {
-      backgroundColor: theme.colors.primary,
-      borderRadius: 12,
-      paddingVertical: 16,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    buttonText: {
-      color: theme.colors.white,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    linkButton: {
-      alignItems: 'center',
-      marginTop: 16,
+    formContainer: {
+      marginBottom: 24,
     },
     linkText: {
       color: theme.colors.primary,
       fontSize: 16,
       fontWeight: '500',
-    },
-    forgotPassword: {
-      alignItems: 'center',
-      marginTop: 24,
+      textAlign: 'center',
+      marginTop: 16,
     },
     forgotPasswordText: {
       color: theme.colors.textSecondary,
       fontSize: 14,
+      textAlign: 'center',
+      marginTop: 24,
     },
   });
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.content}>
-        <Text style={styles.title}>Bienvenue !</Text>
-        <Text style={styles.subtitle}>Connectez-vous pour continuer</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.content}>
+          <Text style={styles.title}>Bienvenue !</Text>
+          <Text style={styles.subtitle}>Connectez-vous pour continuer votre aventure</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={theme.colors.placeholder}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+          <View style={styles.formContainer}>
+            <Input
+              label="Email"
+              placeholder="votre@email.com"
+              leftIcon="mail"
+              value={formState.email.value}
+              onChangeText={(text) => updateField('email', text)}
+              error={formState.email.error}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              required
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Mot de passe"
-          placeholderTextColor={theme.colors.placeholder}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+            <Input
+              label="Mot de passe"
+              placeholder="Votre mot de passe"
+              leftIcon="lock-closed"
+              value={formState.password.value}
+              onChangeText={(text) => updateField('password', text)}
+              error={formState.password.error}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              required
+            />
+          </View>
 
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleLogin}
-          disabled={isLoading}
-        >
-          <Text style={styles.buttonText}>
-            {isLoading ? 'Connexion...' : 'Se connecter'}
+          <Button
+            title="Se connecter"
+            onPress={handleLogin}
+            loading={isLoading}
+            disabled={!isFormValid || isLoading}
+            fullWidth
+            size="large"
+          />
+
+          <Button
+            title="Créer un compte"
+            onPress={() => navigation.navigate('Register')}
+            variant="outline"
+            fullWidth
+            style={{ marginTop: 16 }}
+          />
+
+          <Text
+            style={styles.forgotPasswordText}
+            onPress={() => navigation.navigate('ForgotPassword')}
+          >
+            Mot de passe oublié ?
           </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.linkButton}
-          onPress={() => navigation.navigate('Register')}
-        >
-          <Text style={styles.linkText}>Créer un compte</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.forgotPassword}
-          onPress={() => navigation.navigate('ForgotPassword')}
-        >
-          <Text style={styles.forgotPasswordText}>Mot de passe oublié ?</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 

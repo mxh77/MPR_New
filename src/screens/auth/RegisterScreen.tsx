@@ -1,74 +1,77 @@
 /**
- * Écran d'inscription
+ * Écran d'inscription avec nouveaux composants
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ScrollView,
 } from 'react-native';
-import { useAuth, useTheme } from '../../contexts';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../components/navigation/AuthNavigator';
 
+import { useAuth, useTheme } from '../../contexts';
+import { useForm } from '../../hooks';
+import { Button, Input } from '../../components/common';
+
 type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
 export const RegisterScreen: React.FC = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-  });
-  const [isLoading, setIsLoading] = useState(false);
-
   const { register } = useAuth();
   const { theme } = useTheme();
   const navigation = useNavigation<RegisterScreenNavigationProp>();
 
+  // Utilisation du hook useForm avec validation
+  const { formState, updateField, validateForm, isFormValid } = useForm(
+    {
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+    {
+      firstName: { required: true },
+      lastName: { required: true },
+      email: { required: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
+      password: { required: true, minLength: 6 },
+      confirmPassword: { 
+        required: true,
+        custom: (value: string) => {
+          if (value !== formState.password?.value) {
+            return 'Les mots de passe ne correspondent pas';
+          }
+          return undefined;
+        }
+      },
+    }
+  );
+
+  const [isLoading, setIsLoading] = React.useState(false);
+
   const handleRegister = async () => {
-    const { email, password, confirmPassword, firstName, lastName } = formData;
-
-    if (!email || !password || !firstName || !lastName) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+    if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
     try {
       await register({
-        email,
-        password,
-        firstName,
-        lastName,
+        email: formState.email.value,
+        password: formState.password.value,
+        firstName: formState.firstName.value,
+        lastName: formState.lastName.value,
       });
     } catch (error) {
-      Alert.alert('Erreur d\'inscription', 'Une erreur est survenue lors de l\'inscription');
+      console.error('Erreur inscription:', error);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const updateFormData = (field: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const styles = StyleSheet.create({
@@ -83,7 +86,7 @@ export const RegisterScreen: React.FC = () => {
       paddingVertical: 32,
     },
     title: {
-      fontSize: 28,
+      fontSize: 32,
       fontWeight: 'bold',
       color: theme.colors.text,
       textAlign: 'center',
@@ -93,123 +96,113 @@ export const RegisterScreen: React.FC = () => {
       fontSize: 16,
       color: theme.colors.textSecondary,
       textAlign: 'center',
-      marginBottom: 32,
+      marginBottom: 40,
     },
-    input: {
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      fontSize: 16,
-      color: theme.colors.text,
-      backgroundColor: theme.colors.surface,
-      marginBottom: 16,
-    },
-    button: {
-      backgroundColor: theme.colors.primary,
-      borderRadius: 12,
-      paddingVertical: 16,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    buttonText: {
-      color: theme.colors.white,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    linkButton: {
-      alignItems: 'center',
-      marginTop: 16,
+    formContainer: {
+      marginBottom: 24,
     },
     linkText: {
       color: theme.colors.primary,
       fontSize: 16,
       fontWeight: '500',
+      textAlign: 'center',
+      marginTop: 16,
     },
   });
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Créer un compte</Text>
-        <Text style={styles.subtitle}>Rejoignez la communauté Mon Petit Roadtrip</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.title}>Créer un compte</Text>
+          <Text style={styles.subtitle}>Rejoignez la communauté Mon Petit Roadtrip</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Prénom *"
-          placeholderTextColor={theme.colors.placeholder}
-          value={formData.firstName}
-          onChangeText={(value) => updateFormData('firstName', value)}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
+          <View style={styles.formContainer}>
+            <Input
+              label="Prénom"
+              placeholder="Votre prénom"
+              leftIcon="person"
+              value={formState.firstName?.value || ''}
+              onChangeText={(text) => updateField('firstName', text)}
+              error={formState.firstName?.error}
+              autoCapitalize="words"
+              autoCorrect={false}
+              required
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Nom *"
-          placeholderTextColor={theme.colors.placeholder}
-          value={formData.lastName}
-          onChangeText={(value) => updateFormData('lastName', value)}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
+            <Input
+              label="Nom"
+              placeholder="Votre nom"
+              leftIcon="person"
+              value={formState.lastName?.value || ''}
+              onChangeText={(text) => updateField('lastName', text)}
+              error={formState.lastName?.error}
+              autoCapitalize="words"
+              autoCorrect={false}
+              required
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email *"
-          placeholderTextColor={theme.colors.placeholder}
-          value={formData.email}
-          onChangeText={(value) => updateFormData('email', value)}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+            <Input
+              label="Email"
+              placeholder="votre@email.com"
+              leftIcon="mail"
+              value={formState.email?.value || ''}
+              onChangeText={(text) => updateField('email', text)}
+              error={formState.email?.error}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              required
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Mot de passe *"
-          placeholderTextColor={theme.colors.placeholder}
-          value={formData.password}
-          onChangeText={(value) => updateFormData('password', value)}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+            <Input
+              label="Mot de passe"
+              placeholder="Votre mot de passe"
+              leftIcon="lock-closed"
+              value={formState.password?.value || ''}
+              onChangeText={(text) => updateField('password', text)}
+              error={formState.password?.error}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              required
+            />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Confirmer le mot de passe *"
-          placeholderTextColor={theme.colors.placeholder}
-          value={formData.confirmPassword}
-          onChangeText={(value) => updateFormData('confirmPassword', value)}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+            <Input
+              label="Confirmer le mot de passe"
+              placeholder="Confirmez votre mot de passe"
+              leftIcon="lock-closed"
+              value={formState.confirmPassword?.value || ''}
+              onChangeText={(text) => updateField('confirmPassword', text)}
+              error={formState.confirmPassword?.error}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              required
+            />
+          </View>
 
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleRegister}
-          disabled={isLoading}
-        >
-          <Text style={styles.buttonText}>
-            {isLoading ? 'Inscription...' : 'S\'inscrire'}
-          </Text>
-        </TouchableOpacity>
+          <Button
+            title="S'inscrire"
+            onPress={handleRegister}
+            loading={isLoading}
+            disabled={!isFormValid || isLoading}
+            fullWidth
+            size="large"
+          />
 
-        <TouchableOpacity
-          style={styles.linkButton}
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Text style={styles.linkText}>Déjà un compte ? Se connecter</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <Button
+            title="Déjà un compte ? Se connecter"
+            onPress={() => navigation.navigate('Login')}
+            variant="outline"
+            fullWidth
+            style={{ marginTop: 16 }}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
-
-export default RegisterScreen;
