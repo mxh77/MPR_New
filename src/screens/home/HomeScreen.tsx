@@ -1,5 +1,5 @@
 /**
- * Écran d'accueil principal
+ * Écran d'accueil principal avec nouveaux composants
  */
 import React from 'react';
 import {
@@ -7,15 +7,39 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useTheme } from '../../contexts';
+import { useNetworkStatus } from '../../hooks';
+import { Button, Card } from '../../components/common';
 
 export const HomeScreen: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
+  const { isConnected } = useNetworkStatus();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bonjour';
+    if (hour < 18) return 'Bon après-midi';
+    return 'Bonsoir';
+  };
+
+  const handleCreateRoadtrip = () => {
+    // TODO: Navigation vers création roadtrip
+    console.log('Créer un nouveau roadtrip');
+  };
+
+  const handleSearchActivities = () => {
+    // TODO: Navigation vers recherche
+    console.log('Rechercher des activités');
+  };
+
+  const handleExploreMap = () => {
+    // TODO: Navigation vers carte
+    console.log('Explorer la carte');
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -48,16 +72,31 @@ export const HomeScreen: React.FC = () => {
       color: theme.colors.text,
       marginBottom: 12,
     },
-    card: {
-      backgroundColor: theme.colors.card,
-      borderRadius: 12,
-      padding: 16,
+    quickActions: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 24,
+    },
+    actionButton: {
+      flex: 1,
+      marginHorizontal: 4,
+    },
+    networkStatus: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+      padding: 12,
+      backgroundColor: isConnected ? theme.colors.success : theme.colors.danger,
+      borderRadius: 8,
+    },
+    networkText: {
+      color: theme.colors.white,
+      fontSize: 14,
+      fontWeight: '500',
+      marginLeft: 8,
+    },
+    activityCard: {
       marginBottom: 12,
-      shadowColor: theme.colors.black,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
     },
     cardHeader: {
       flexDirection: 'row',
@@ -78,33 +117,25 @@ export const HomeScreen: React.FC = () => {
       color: theme.colors.textSecondary,
       lineHeight: 20,
     },
-    quickActions: {
+    statsContainer: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 24,
+      justifyContent: 'space-around',
+      paddingVertical: 16,
     },
-    actionButton: {
-      flex: 1,
-      backgroundColor: theme.colors.primary,
-      borderRadius: 12,
-      padding: 16,
+    statItem: {
       alignItems: 'center',
-      marginHorizontal: 4,
     },
-    actionButtonText: {
-      color: theme.colors.white,
-      fontSize: 14,
-      fontWeight: '600',
-      marginTop: 4,
+    statValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: theme.colors.primary,
+      marginBottom: 4,
+    },
+    statLabel: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
     },
   });
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -114,6 +145,18 @@ export const HomeScreen: React.FC = () => {
             {getGreeting()}{user?.firstName ? `, ${user.firstName}` : ''} !
           </Text>
           <Text style={styles.subtitle}>Prêt pour votre prochaine aventure ?</Text>
+          
+          {/* Indicateur de connexion */}
+          <View style={styles.networkStatus}>
+            <Ionicons 
+              name={isConnected ? "cellular" : "cellular-outline"} 
+              size={16} 
+              color={theme.colors.white} 
+            />
+            <Text style={styles.networkText}>
+              {isConnected ? 'En ligne' : 'Mode hors ligne'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.content}>
@@ -121,18 +164,26 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions rapides</Text>
             <View style={styles.quickActions}>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="add-circle" size={24} color={theme.colors.white} />
-                <Text style={styles.actionButtonText}>Nouveau{'\n'}Roadtrip</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="search" size={24} color={theme.colors.white} />
-                <Text style={styles.actionButtonText}>Rechercher{'\n'}Activités</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="map" size={24} color={theme.colors.white} />
-                <Text style={styles.actionButtonText}>Explorer{'\n'}Cartes</Text>
-              </TouchableOpacity>
+              <Button
+                title="Nouveau Roadtrip"
+                onPress={handleCreateRoadtrip}
+                style={styles.actionButton}
+                size="small"
+              />
+              <Button
+                title="Rechercher"
+                onPress={handleSearchActivities}
+                variant="outline"
+                style={styles.actionButton}
+                size="small"
+              />
+              <Button
+                title="Explorer"
+                onPress={handleExploreMap}
+                variant="outline"
+                style={styles.actionButton}
+                size="small"
+              />
             </View>
           </View>
 
@@ -140,7 +191,7 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Activités récentes</Text>
             
-            <TouchableOpacity style={styles.card}>
+            <Card style={styles.activityCard} onPress={() => console.log('Randonnée')}>
               <View style={styles.cardHeader}>
                 <Ionicons 
                   name="walk" 
@@ -154,9 +205,9 @@ export const HomeScreen: React.FC = () => {
                 Une magnifique randonnée avec vue panoramique sur les Alpes. 
                 Durée: 4h30 - Difficulté: Modérée
               </Text>
-            </TouchableOpacity>
+            </Card>
 
-            <TouchableOpacity style={styles.card}>
+            <Card style={styles.activityCard} onPress={() => console.log('Hébergement')}>
               <View style={styles.cardHeader}>
                 <Ionicons 
                   name="bed" 
@@ -170,9 +221,9 @@ export const HomeScreen: React.FC = () => {
                 Hébergement cosy en montagne avec petit-déjeuner inclus.
                 Réservation pour 2 nuits.
               </Text>
-            </TouchableOpacity>
+            </Card>
 
-            <TouchableOpacity style={styles.card}>
+            <Card style={styles.activityCard} onPress={() => console.log('Restaurant')}>
               <View style={styles.cardHeader}>
                 <Ionicons 
                   name="restaurant" 
@@ -186,27 +237,29 @@ export const HomeScreen: React.FC = () => {
                 Spécialités savoyardes dans un cadre authentique.
                 Réservation prévue pour demain 19h30.
               </Text>
-            </TouchableOpacity>
+            </Card>
           </View>
 
           {/* Statistiques */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Vos statistiques</Text>
             
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons 
-                  name="analytics" 
-                  size={24} 
-                  color={theme.colors.info} 
-                  style={styles.cardIcon}
-                />
-                <Text style={styles.cardTitle}>Activités cette année</Text>
+            <Card>
+              <View style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>12</Text>
+                  <Text style={styles.statLabel}>Roadtrips</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>47</Text>
+                  <Text style={styles.statLabel}>Activités</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>1,240</Text>
+                  <Text style={styles.statLabel}>km parcourus</Text>
+                </View>
               </View>
-              <Text style={styles.cardDescription}>
-                🥾 12 randonnées • 🏨 8 hébergements • 🍽️ 15 restaurants • 🚗 5 roadtrips
-              </Text>
-            </View>
+            </Card>
           </View>
         </View>
       </ScrollView>
