@@ -12,5 +12,8 @@ export { apiClient } from './api';
 // Auth
 export { default as authService } from './auth/AuthService';
 
+// Sync
+export { syncService } from './sync';
+
 // Repositories
 export * from './repositories/BaseRepository';
