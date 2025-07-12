@@ -1,5 +1,9 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# ❌ NE JAMAIS inclure ces dossiers dans le nouveau repo
+monpetitroadtrip_mobile/
+Refonte/
+
 # dependencies
 node_modules/
 
@@ -8,6 +12,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+build/
 
 # Native
 .kotlin/
@@ -32,6 +37,14 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
 
 # typescript
 *.tsbuildinfo
+
+# Fichiers temporaires
+*.log
+*.tmp
+
+# IDE
+.vscode/settings.json
