@@ -7,8 +7,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 
 import { useAuth, useTheme } from '../../contexts';
-import { AuthNavigator } from './AuthNavigator';
-import { MainNavigator } from './MainNavigator';
+import AuthNavigator from './AuthNavigator';
+import MainNavigator from './MainNavigator';
 import { LoadingScreen } from '../../screens/LoadingScreen';
 
 // Types pour la navigation root

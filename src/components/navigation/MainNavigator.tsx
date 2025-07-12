@@ -6,9 +6,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts';
 
-import { HomeNavigator } from './HomeNavigator';
-import { RoadtripsNavigator } from './RoadtripsNavigator';
-import { ProfileNavigator } from './ProfileNavigator';
+import HomeNavigator from './HomeNavigator';
+import RoadtripsNavigator from './RoadtripsNavigator';
+import ProfileNavigator from './ProfileNavigator';
 
 // Types pour la navigation main avec tabs
 export type MainTabParamList = {
