@@ -19,10 +19,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts';
 import { useRoadtripsWithApi } from '../../hooks';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2; // 2 colonnes avec marges
+
+type RoadtripsListNavigationProp = NativeStackNavigationProp<RoadtripsStackParamList, 'RoadtripsList'>;
 
 // Styles pour les cartes (définis ici pour éviter les conflits de nommage)
 const cardStyles = StyleSheet.create({
@@ -209,7 +213,8 @@ const RoadtripCard: React.FC<RoadtripCardProps> = ({ item, onPress, theme }) => 
 };
 
 export const RoadtripsListScreenWithApi: React.FC = () => {
-  const { theme } = useTheme();  const {
+  const { theme } = useTheme();
+  const navigation = useNavigation<RoadtripsListNavigationProp>();  const {
     roadtrips,
     loading,
     error,
@@ -373,8 +378,8 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
       item={item}
       theme={theme}
       onPress={() => {
-        // Navigation vers le détail du roadtrip
         console.log('Navigation vers roadtrip:', item.id);
+        navigation.navigate('RoadtripDetail', { roadtripId: item.id });
       }}
     />
   );

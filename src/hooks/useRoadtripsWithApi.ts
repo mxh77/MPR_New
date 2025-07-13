@@ -165,7 +165,7 @@ export const useRoadtripsWithApi = () => {
                 roadtrip.currency = apiRoadtrip.currency || 'EUR';
                 roadtrip.userId = user._id;
                 roadtrip.isPublic = false;
-                roadtrip.thumbnail = extractThumbnailUrl(apiRoadtrip.thumbnail);
+                roadtrip.thumbnail = thumbnailUrl;
                 roadtrip.photos = apiRoadtrip.photos || [];
                 roadtrip.documents = apiRoadtrip.documents || [];
                 roadtrip.totalSteps = apiRoadtrip.steps ? apiRoadtrip.steps.length : 0;

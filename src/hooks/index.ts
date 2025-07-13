@@ -6,6 +6,7 @@ export { useSync } from './useSyncExpoGo';  // Gardons la version simplifiée po
 export { useForm } from './useForm';
 export { useRoadtrips } from './useRoadtripsExpoGo';  // Version simplifiée temporaire
 export { default as useRoadtripsWithApi } from './useRoadtripsWithApi'; // Version avec API
+export { default as useRoadtripDetail } from './useRoadtripDetail'; // Hook pour détail roadtrip
 
 // Types
 export type { NetworkState } from './useNetworkStatus';

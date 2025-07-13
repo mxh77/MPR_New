@@ -4,10 +4,14 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RoadtripsListScreenWithApi } from '../../screens/roadtrips/RoadtripsListScreenWithApi';
+import { RoadtripDetailScreen } from '../../screens/roadtrips/RoadtripDetailScreen';
 
 // Types pour la navigation roadtrips
 export type RoadtripsStackParamList = {
   RoadtripsList: undefined;
+  RoadtripDetail: {
+    roadtripId: string;
+  };
 };
 
 const RoadtripsStack = createNativeStackNavigator<RoadtripsStackParamList>();
@@ -24,6 +28,7 @@ export const RoadtripsNavigator: React.FC = () => {
       }}
     >
       <RoadtripsStack.Screen name="RoadtripsList" component={RoadtripsListScreenWithApi} />
+      <RoadtripsStack.Screen name="RoadtripDetail" component={RoadtripDetailScreen} />
     </RoadtripsStack.Navigator>
   );
 };
