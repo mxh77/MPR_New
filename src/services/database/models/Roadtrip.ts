@@ -19,6 +19,9 @@ export default class Roadtrip extends BaseModel {
   @field('description') description?: string;
   @field('start_date') startDate!: number;
   @field('end_date') endDate!: number;
+  @field('start_location') startLocation?: string;
+  @field('end_location') endLocation?: string;
+  @field('currency') currency?: string;
   @field('user_id') userId!: string;
   @field('is_public') isPublic!: boolean;
   @field('thumbnail') thumbnail?: string;
@@ -26,6 +29,9 @@ export default class Roadtrip extends BaseModel {
   @field('total_distance') totalDistance?: number;
   @field('estimated_duration') estimatedDuration?: number;
   @field('tags') tagsJson!: string;
+  @field('photos') photosJson!: string;
+  @field('documents') documentsJson!: string;
+  @field('server_id') serverId?: string;
 
   @children('steps') steps: any;
   @children('roadtrip_tasks') tasks: any;
@@ -52,6 +58,42 @@ export default class Roadtrip extends BaseModel {
   }
 
   /**
+   * Getter pour les photos (parse du JSON)
+   */
+  get photos(): string[] {
+    try {
+      return JSON.parse(this.photosJson || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Setter pour les photos (stringify en JSON)
+   */
+  set photos(value: string[]) {
+    this.photosJson = JSON.stringify(value);
+  }
+
+  /**
+   * Getter pour les documents (parse du JSON)
+   */
+  get documents(): string[] {
+    try {
+      return JSON.parse(this.documentsJson || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Setter pour les documents (stringify en JSON)
+   */
+  set documents(value: string[]) {
+    this.documentsJson = JSON.stringify(value);
+  }
+
+  /**
    * Convertit le modèle vers l'interface TypeScript
    */
   toInterface(): IRoadtrip {
@@ -61,6 +103,9 @@ export default class Roadtrip extends BaseModel {
       description: this.description,
       startDate: new Date(this.startDate),
       endDate: new Date(this.endDate),
+      startLocation: this.startLocation,
+      endLocation: this.endLocation,
+      currency: this.currency,
       userId: this.userId,
       isPublic: this.isPublic,
       thumbnail: this.thumbnail,
@@ -68,6 +113,9 @@ export default class Roadtrip extends BaseModel {
       totalDistance: this.totalDistance,
       estimatedDuration: this.estimatedDuration,
       tags: this.tags,
+      photos: this.photos,
+      documents: this.documents,
+      serverId: this.serverId,
       syncStatus: this.customSyncStatus as any,
       lastSyncAt: this.lastSyncAt,
       createdAt: this.createdAt,

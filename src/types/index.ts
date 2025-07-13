@@ -50,6 +50,9 @@ export interface Roadtrip extends BaseEntity {
   description?: string;
   startDate: Date;
   endDate: Date;
+  startLocation?: string;
+  endLocation?: string;
+  currency?: string;
   userId: string;
   isPublic: boolean;
   thumbnail?: string;
@@ -57,6 +60,9 @@ export interface Roadtrip extends BaseEntity {
   totalDistance?: number;
   estimatedDuration?: number;
   tags: string[];
+  photos?: string[];
+  documents?: string[];
+  serverId?: string; // Pour liaison avec l'API
 }
 
 // Étape

@@ -4,7 +4,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 1,
+  version: 2, // Incrémentation de version pour migration
   tables: [
     // Table des roadtrips
     tableSchema({
@@ -14,6 +14,9 @@ export const schema = appSchema({
         { name: 'description', type: 'string', isOptional: true },
         { name: 'start_date', type: 'number' },
         { name: 'end_date', type: 'number' },
+        { name: 'start_location', type: 'string', isOptional: true },
+        { name: 'end_location', type: 'string', isOptional: true },
+        { name: 'currency', type: 'string', isOptional: true },
         { name: 'user_id', type: 'string' },
         { name: 'is_public', type: 'boolean' },
         { name: 'thumbnail', type: 'string', isOptional: true },
@@ -21,6 +24,9 @@ export const schema = appSchema({
         { name: 'total_distance', type: 'number', isOptional: true },
         { name: 'estimated_duration', type: 'number', isOptional: true },
         { name: 'tags', type: 'string' }, // JSON array
+        { name: 'photos', type: 'string' }, // JSON array
+        { name: 'documents', type: 'string' }, // JSON array
+        { name: 'server_id', type: 'string', isOptional: true },
         { name: 'sync_status', type: 'string' },
         { name: 'last_sync_at', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },

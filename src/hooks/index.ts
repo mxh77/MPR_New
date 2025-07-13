@@ -5,6 +5,7 @@ export { useNetworkStatus } from './useNetworkStatus';
 export { useSync } from './useSyncExpoGo';  // Gardons la version simplifiée pour l'instant
 export { useForm } from './useForm';
 export { useRoadtrips } from './useRoadtripsExpoGo';  // Version simplifiée temporaire
+export { default as useRoadtripsWithApi } from './useRoadtripsWithApi'; // Version avec API
 
 // Types
 export type { NetworkState } from './useNetworkStatus';
