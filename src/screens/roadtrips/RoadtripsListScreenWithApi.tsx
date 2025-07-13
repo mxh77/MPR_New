@@ -209,16 +209,16 @@ const RoadtripCard: React.FC<RoadtripCardProps> = ({ item, onPress, theme }) => 
 };
 
 export const RoadtripsListScreenWithApi: React.FC = () => {
-  const { theme } = useTheme();
-  const { 
-    roadtrips, 
-    loading, 
-    error, 
+  const { theme } = useTheme();  const {
+    roadtrips,
+    loading,
+    error,
     syncing,
     isOnline,
-    fetchRoadtrips, 
+    fetchRoadtrips,
     createRoadtrip,
     syncWithApi,
+    refreshRoadtrips, // Nouvelle fonction
     totalRoadtrips,
     pendingSyncCount,
     errorSyncCount
@@ -226,18 +226,20 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
   
   const [refreshing, setRefreshing] = useState(false);
 
-  // Refresh à chaque focus de l'écran
+  // Refresh à chaque focus de l'écran (sans force sync)
   useFocusEffect(
     useCallback(() => {
-      fetchRoadtrips();
-    }, [fetchRoadtrips])
+      if (roadtrips.length === 0) {
+        fetchRoadtrips();
+      }
+    }, [fetchRoadtrips, roadtrips.length])
   );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchRoadtrips();
+    await refreshRoadtrips(); // Utilise la fonction qui force la sync
     setRefreshing(false);
-  }, [fetchRoadtrips]);
+  }, [refreshRoadtrips]);
 
   const handleCreateTestRoadtrip = async () => {
     try {

@@ -3,7 +3,7 @@
  */
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { RoadtripsListScreen } from '../../screens/roadtrips/RoadtripsListScreen';
+import { RoadtripsListScreenWithApi } from '../../screens/roadtrips/RoadtripsListScreenWithApi';
 
 // Types pour la navigation roadtrips
 export type RoadtripsStackParamList = {
@@ -23,7 +23,7 @@ export const RoadtripsNavigator: React.FC = () => {
         animation: 'slide_from_right',
       }}
     >
-      <RoadtripsStack.Screen name="RoadtripsList" component={RoadtripsListScreen} />
+      <RoadtripsStack.Screen name="RoadtripsList" component={RoadtripsListScreenWithApi} />
     </RoadtripsStack.Navigator>
   );
 };

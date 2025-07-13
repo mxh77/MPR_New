@@ -111,7 +111,7 @@ export const useRoadtripsWithApi = () => {
    * Synchroniser avec l'API (si en ligne)
    */
   const syncWithApi = useCallback(async () => {
-    if (!isOnline || !user || syncing) return;
+    if (!isOnline || !user || syncing || !database) return;
     
     try {
       setSyncing(true);
@@ -123,61 +123,47 @@ export const useRoadtripsWithApi = () => {
       
       console.log(`📥 ${apiRoadtrips.length} roadtrips reçus de l'API`);
       
-      if (!database) return;
-      
       const roadtripsCollection = database.get<Roadtrip>('roadtrips');
+      
+      // Récupérer tous les roadtrips locaux existants d'abord
+      const existingLocalRoadtrips = await roadtripsCollection
+        .query(Q.where('user_id', user._id))
+        .fetch();
+      
+      console.log(`📍 ${existingLocalRoadtrips.length} roadtrips déjà en local`);
+      
+      let hasChanges = false;
       
       // Pour chaque roadtrip de l'API
       for (const apiRoadtrip of apiRoadtrips) {
         try {
-          // Vérifier s'il existe déjà localement
-          const existingRecords = await roadtripsCollection
-            .query(Q.where('server_id', apiRoadtrip._id))
-            .fetch();
+          // Vérifier s'il existe déjà localement par server_id
+          const existingRecord = existingLocalRoadtrips.find(
+            local => local.serverId === apiRoadtrip._id
+          );
           
-          if (existingRecords.length > 0) {
-            // Mettre à jour si nécessaire
-            const existingRecord = existingRecords[0];
-            const apiUpdatedAt = new Date(apiRoadtrip.updatedAt);
-            
-            if (apiUpdatedAt > existingRecord.updatedAt) {
-              await database.write(async () => {
-                await existingRecord.update(roadtrip => {
-                  roadtrip.title = apiRoadtrip.name;
-                  roadtrip.description = apiRoadtrip.notes;
-                  roadtrip.startDate = new Date(apiRoadtrip.startDateTime).getTime();
-                  roadtrip.endDate = new Date(apiRoadtrip.endDateTime).getTime();
-                  roadtrip.startLocation = apiRoadtrip.startLocation;
-                  roadtrip.endLocation = apiRoadtrip.endLocation;
-                  roadtrip.currency = apiRoadtrip.currency;
-                  roadtrip.thumbnail = apiRoadtrip.thumbnail;
-                  roadtrip.photos = apiRoadtrip.photos;
-                  roadtrip.documents = apiRoadtrip.documents;
-                  roadtrip.totalSteps = apiRoadtrip.steps.length;
-                  roadtrip.lastSyncAt = new Date();
-                  roadtrip.customSyncStatus = 'synced';
-                });
-              });
-              console.log(`🔄 Roadtrip mis à jour: ${apiRoadtrip.name}`);
-            }
+          if (existingRecord) {
+            console.log(`📋 Roadtrip ${apiRoadtrip.name} existe déjà (serverId: ${existingRecord.serverId})`);
+            // Pas de mise à jour pour l'instant - éviter les boucles
           } else {
             // Créer nouveau roadtrip local
+            console.log(`➕ Création nouveau roadtrip: ${apiRoadtrip.name}`);
             await database.write(async () => {
               await roadtripsCollection.create(roadtrip => {
                 roadtrip.serverId = apiRoadtrip._id;
                 roadtrip.title = apiRoadtrip.name;
-                roadtrip.description = apiRoadtrip.notes;
+                roadtrip.description = apiRoadtrip.notes || '';
                 roadtrip.startDate = new Date(apiRoadtrip.startDateTime).getTime();
                 roadtrip.endDate = new Date(apiRoadtrip.endDateTime).getTime();
-                roadtrip.startLocation = apiRoadtrip.startLocation;
-                roadtrip.endLocation = apiRoadtrip.endLocation;
-                roadtrip.currency = apiRoadtrip.currency;
+                roadtrip.startLocation = apiRoadtrip.startLocation || '';
+                roadtrip.endLocation = apiRoadtrip.endLocation || '';
+                roadtrip.currency = apiRoadtrip.currency || 'EUR';
                 roadtrip.userId = user._id;
                 roadtrip.isPublic = false;
-                roadtrip.thumbnail = apiRoadtrip.thumbnail;
+                roadtrip.thumbnail = apiRoadtrip.thumbnail || undefined;
                 roadtrip.photos = apiRoadtrip.photos || [];
                 roadtrip.documents = apiRoadtrip.documents || [];
-                roadtrip.totalSteps = apiRoadtrip.steps.length;
+                roadtrip.totalSteps = apiRoadtrip.steps ? apiRoadtrip.steps.length : 0;
                 roadtrip.totalDistance = 0;
                 roadtrip.estimatedDuration = 0;
                 roadtrip.tags = [];
@@ -185,15 +171,26 @@ export const useRoadtripsWithApi = () => {
                 roadtrip.lastSyncAt = new Date();
               });
             });
-            console.log(`➕ Nouveau roadtrip créé: ${apiRoadtrip.name}`);
+            hasChanges = true;
+            console.log(`✅ Nouveau roadtrip créé: ${apiRoadtrip.name}`);
           }
         } catch (itemError) {
           console.error(`❌ Erreur sync roadtrip ${apiRoadtrip._id}:`, itemError);
         }
       }
       
-      // Recharger les données locales
-      await fetchLocalRoadtrips();
+      // Recharger seulement si des changements ont été faits
+      if (hasChanges) {
+        const roadtripRecords = await roadtripsCollection
+          .query(Q.where('user_id', user._id))
+          .fetch();
+        
+        const roadtripsData = roadtripRecords.map(convertRecordToData);
+        setRoadtrips(roadtripsData);
+        console.log(`✅ ${roadtripsData.length} roadtrips mis à jour localement`);
+      } else {
+        console.log('📋 Aucun changement détecté, synchronisation terminée');
+      }
       
       console.log('✅ Synchronisation terminée');
     } catch (err) {
@@ -202,12 +199,12 @@ export const useRoadtripsWithApi = () => {
     } finally {
       setSyncing(false);
     }
-  }, [isOnline, user, syncing, database, fetchLocalRoadtrips]);
+  }, [isOnline, user, syncing, database]);
 
   /**
-   * Charger les roadtrips (local + sync si online)
+   * Charger les roadtrips (local + sync si online et first load)
    */
-  const fetchRoadtrips = useCallback(async () => {
+  const fetchRoadtrips = useCallback(async (forceSync: boolean = false) => {
     if (!isReady || !database || !user) return;
     
     try {
@@ -217,9 +214,10 @@ export const useRoadtripsWithApi = () => {
       // Toujours charger le local en premier (offline-first)
       await fetchLocalRoadtrips();
       
-      // Synchroniser avec l'API si en ligne
-      if (isOnline) {
-        await syncWithApi();
+      // Synchroniser avec l'API seulement si demandé explicitement ou premier chargement
+      if (isOnline && !syncing && (forceSync || roadtrips.length === 0)) {
+        console.log('🔄 Déclenchement sync API...');
+        syncWithApi();
       }
     } catch (err) {
       console.error('❌ Erreur fetchRoadtrips:', err);
@@ -227,7 +225,7 @@ export const useRoadtripsWithApi = () => {
     } finally {
       setLoading(false);
     }
-  }, [isReady, database, user, isOnline, fetchLocalRoadtrips, syncWithApi]);
+  }, [isReady, database, user, isOnline, fetchLocalRoadtrips, syncing, roadtrips.length]);
 
   /**
    * Créer un nouveau roadtrip (optimiste)
@@ -272,7 +270,15 @@ export const useRoadtripsWithApi = () => {
       // Synchronisation avec l'API en arrière-plan si en ligne
       if (isOnline) {
         try {
-          const createRequest = roadtripsApiService.convertLocalRoadtripToApi(newRoadtripData);
+          const createRequest = {
+            name: newRoadtripData.title,
+            notes: newRoadtripData.description || '',
+            startDateTime: newRoadtripData.startDate.toISOString(),
+            endDateTime: newRoadtripData.endDate.toISOString(),
+            startLocation: newRoadtripData.startLocation || '',
+            endLocation: newRoadtripData.endLocation || '',
+            currency: newRoadtripData.currency || 'EUR',
+          };
           const apiRoadtrip = await roadtripsApiService.createRoadtrip(createRequest);
           
           // Mettre à jour avec l'ID serveur
@@ -346,17 +352,20 @@ export const useRoadtripsWithApi = () => {
     }
   }, [isReady, database, isOnline]);
 
-  // Auto-load au montage
+  // Auto-load au montage seulement
   useEffect(() => {
-    fetchRoadtrips();
-  }, [fetchRoadtrips]);
-
-  // Resync quand on repasse en ligne
-  useEffect(() => {
-    if (isOnline && roadtrips.length > 0) {
-      syncWithApi();
+    if (isReady && database && user && roadtrips.length === 0 && !loading) {
+      console.log('🚀 Chargement initial des roadtrips...');
+      fetchRoadtrips();
     }
-  }, [isOnline, syncWithApi]);
+  }, [isReady, database, user]);
+
+  // Désactiver le resync automatique - on sync seulement au pull-to-refresh
+  // useEffect(() => {
+  //   if (isOnline && roadtrips.length === 0 && !loading && !syncing) {
+  //     syncWithApi();
+  //   }
+  // }, [isOnline]);
 
   return {
     roadtrips,
@@ -370,6 +379,9 @@ export const useRoadtripsWithApi = () => {
     createRoadtrip,
     deleteRoadtrip,
     syncWithApi,
+    
+    // Actions spécifiques
+    refreshRoadtrips: () => fetchRoadtrips(true), // Force la synchronisation
     
     // Stats
     totalRoadtrips: roadtrips.length,

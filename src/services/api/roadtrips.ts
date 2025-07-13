@@ -99,10 +99,23 @@ class RoadtripsApiService {
    * Récupérer la liste des roadtrips de l'utilisateur
    */
   async getRoadtrips(page: number = 1, limit: number = 10): Promise<PaginatedResponse<ApiRoadtrip>> {
-    const response = await apiClient.get<PaginatedResponse<ApiRoadtrip>>('/roadtrips', {
+    const response = await apiClient.get<ApiRoadtrip[]>('/roadtrips', {
       params: { page, limit }
     });
-    return response.data;
+    
+    // L'API retourne directement un tableau, on l'adapte à notre structure
+    const roadtrips = response.data || [];
+    
+    return {
+      success: true,
+      roadtrips,
+      pagination: {
+        page,
+        limit,
+        total: roadtrips.length,
+        pages: Math.ceil(roadtrips.length / limit)
+      }
+    };
   }
 
   /**

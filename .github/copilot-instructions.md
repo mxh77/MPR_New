@@ -79,3 +79,6 @@ src/
 - **Algolia Search**: Configuration dans `ALGOLIA_CONFIG` pour recherche randonnées
 - **Expo SecureStore**: Stockage JWT tokens
 - **Expo Location**: Géolocalisation avec `LOCATION_CONFIG.accuracy = 6`
+
+## GIT
+- Toujours commiter en français
