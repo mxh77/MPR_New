@@ -260,13 +260,16 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
   const [selectedRoadtrip, setSelectedRoadtrip] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Refresh à chaque focus de l'écran (sans force sync)
+  // Refresh à chaque focus de l'écran (charge initial + retour d'autres écrans)
   useFocusEffect(
     useCallback(() => {
+      // Toujours charger, mais sans forcer la sync si on a déjà des données
       if (roadtrips.length === 0) {
-        fetchRoadtrips();
+        fetchRoadtrips(); // Premier chargement avec sync
+      } else {
+        fetchRoadtrips(false); // Juste reload local rapide
       }
-    }, [fetchRoadtrips, roadtrips.length])
+    }, [fetchRoadtrips])
   );
 
   const handleRefresh = useCallback(async () => {
@@ -275,28 +278,8 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
     setRefreshing(false);
   }, [refreshRoadtrips]);
 
-  const handleCreateTestRoadtrip = async () => {
-    try {
-      const testRoadtrip = {
-        title: `Roadtrip ${new Date().toLocaleDateString()}`,
-        description: 'Roadtrip créé avec la nouvelle API',
-        startDate: new Date(),
-        endDate: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)),
-        startLocation: 'Paris, France',
-        endLocation: 'Nice, France',
-        currency: 'EUR',
-      };
-
-      const result = await createRoadtrip(testRoadtrip);
-      if (result) {
-        Alert.alert('✅ Succès', 'Roadtrip créé avec succès !');
-      } else {
-        Alert.alert('❌ Erreur', 'Impossible de créer le roadtrip');
-      }
-    } catch (err) {
-      console.error('Erreur création:', err);
-      Alert.alert('❌ Erreur', 'Erreur lors de la création du roadtrip');
-    }
+  const handleCreateRoadtrip = () => {
+    navigation.navigate('CreateRoadtrip');
   };
 
   const handleSyncNow = async () => {
@@ -394,7 +377,7 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
           {/* Add button */}
           <TouchableOpacity 
             style={[styles.actionButton, styles.primaryButton, { backgroundColor: theme.colors.primary }]} 
-            onPress={handleCreateTestRoadtrip}
+            onPress={handleCreateRoadtrip}
           >
             <Ionicons name="add" size={24} color={theme.colors.white} />
           </TouchableOpacity>
@@ -452,7 +435,7 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
       </Text>
       <TouchableOpacity 
         style={[styles.emptyButton, { backgroundColor: theme.colors.primary }]}
-        onPress={handleCreateTestRoadtrip}
+        onPress={handleCreateRoadtrip}
       >
         <Ionicons name="add" size={20} color={theme.colors.white} />
         <Text style={[styles.emptyButtonText, { color: theme.colors.white }]}>

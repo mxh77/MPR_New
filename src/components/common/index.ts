@@ -5,6 +5,8 @@ export { Button } from './Button';
 export { Input } from './Input';
 export { Card } from './Card';
 export { RoadtripMenu } from './RoadtripMenu';
+export { DatePickerModal } from './DatePickerModal';
+export { CurrencyPickerModal } from './CurrencyPickerModal';
 
 // Types
 export type { ButtonProps } from './Button';
