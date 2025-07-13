@@ -112,8 +112,13 @@ export const CreateRoadtripScreen: React.FC = () => {
   };
 
   const handleLocationSuggestion = (field: 'startLocation' | 'endLocation', value: string) => {
-    // TODO: Implémenter l'autocomplétion avec une API de géolocalisation
     updateField(field, value);
+  };
+
+  const handlePlaceSelected = (field: 'startLocation' | 'endLocation', place: any) => {
+    // La place sélectionnée contient plus d'informations si nécessaire
+    updateField(field, place.description);
+    console.log('Place sélectionnée pour', field, ':', place);
   };
 
   const handleSubmit = async () => {
@@ -211,6 +216,11 @@ export const CreateRoadtripScreen: React.FC = () => {
     },
     requiredLabel: {
       color: theme.colors.danger,
+    },
+    errorText: {
+      fontSize: 14,
+      color: theme.colors.danger,
+      marginTop: 4,
     },
     dateButton: {
       backgroundColor: theme.colors.card,
@@ -436,10 +446,13 @@ export const CreateRoadtripScreen: React.FC = () => {
               </Text>
               <Input
                 value={formData.startLocation}
-                onChangeText={(value) => handleLocationSuggestion('startLocation', value)}
+                onChangeText={(value) => updateField('startLocation', value)}
                 placeholder="Ex: Paris, France"
-                error={errors.startLocation || undefined}
+                leftIcon="location-outline"
               />
+              {errors.startLocation && (
+                <Text style={styles.errorText}>{errors.startLocation}</Text>
+              )}
             </View>
 
             <View style={styles.formGroup}>
@@ -448,10 +461,13 @@ export const CreateRoadtripScreen: React.FC = () => {
               </Text>
               <Input
                 value={formData.endLocation}
-                onChangeText={(value) => handleLocationSuggestion('endLocation', value)}
+                onChangeText={(value) => updateField('endLocation', value)}
                 placeholder="Ex: Rome, Italie"
-                error={errors.endLocation || undefined}
+                leftIcon="location-outline"
               />
+              {errors.endLocation && (
+                <Text style={styles.errorText}>{errors.endLocation}</Text>
+              )}
             </View>
           </View>
 
