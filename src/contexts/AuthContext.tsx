@@ -3,6 +3,8 @@
  */
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { authService } from '../services';
+import { loginUser, registerUser, checkAuthStatus, type AuthUser } from '../services/api/auth';
+import { ENV_CONFIG } from '../config';
 import type { User, RegisterData } from '../types';
 
 // Types pour le contexte d'authentification
@@ -145,12 +147,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'AUTH_START' });
 
     try {
-      const result = await authService.login(email, password);
+      // Appel API réel - maintenant retourne directement AuthUser
+      const authUser = await loginUser({ email, password });
+      
+      // Convertir AuthUser vers User
+      const user = convertAuthUserToUser(authUser);
+      
+      // Pour le token, on peut utiliser un token factice ou récupérer depuis les cookies
+      // En mode cookie, pas besoin de stocker le token côté client
+      const token = 'cookie-based-auth'; // Token factice car l'auth est basée sur cookies
+      
+      // Sauvegarder l'utilisateur
+      await authService.saveUser(user);
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
-          user: result.user,
-          token: result.token,
+          user,
+          token,
         },
       });
     } catch (error) {
@@ -167,18 +181,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'AUTH_START' });
 
     try {
-      const result = await authService.register(data);
+      // Appel API réel
+      const authResponse = await registerUser({
+        name: `${data.firstName} ${data.lastName}`.trim(),
+        email: data.email,
+        password: data.password,
+      });
+      
+      // Convertir AuthUser vers User avec les noms spécifiés
+      const user = convertAuthUserToUser(authResponse.user, data.firstName, data.lastName);
+      
+      // Sauvegarder le token et l'utilisateur
+      await authService.saveToken(authResponse.token);
+      await authService.saveUser(user);
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
-          user: result.user,
-          token: result.token,
+          user,
+          token: authResponse.token,
         },
       });
     } catch (error) {
       dispatch({
         type: 'AUTH_ERROR',
-        payload: error instanceof Error ? error.message : 'Erreur d\'inscription',
+        payload: error instanceof Error ? error.message : 'Erreur lors de l\'inscription',
       });
       throw error;
     }
@@ -198,6 +225,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Effacer l'erreur
   const clearError = (): void => {
     dispatch({ type: 'CLEAR_ERROR' });
+  };
+
+  // Fonction utilitaire pour convertir AuthUser vers User
+  const convertAuthUserToUser = (authUser: AuthUser, firstName?: string, lastName?: string): User => {
+    const nameParts = authUser.name.split(' ');
+    return {
+      _id: authUser._id,
+      email: authUser.email,
+      firstName: firstName || nameParts[0] || authUser.name,
+      lastName: lastName || nameParts.slice(1).join(' ') || '',
+      avatar: undefined,
+      preferences: {
+        theme: 'auto',
+        language: 'fr',
+        notifications: true,
+        geolocation: true,
+        offlineMode: true,
+      },
+      createdAt: new Date(authUser.createdAt),
+      updatedAt: new Date(authUser.updatedAt),
+    };
   };
 
   const contextValue: AuthContextValue = {

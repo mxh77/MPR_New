@@ -1,25 +1,29 @@
 /**
  * Configuration de l'application Mon Petit Roadtrip
  */
+import ENV from './env';
 
 // Configuration d'environnement
 export const ENV_CONFIG = {
   DEBUG: __DEV__,
   API_BASE_URL: __DEV__ 
-    ? process.env.API_BASE_URL_DEBUG || 'http://localhost:3000'
-    : process.env.API_BASE_URL_RELEASE || 'https://api.monpetitroadtrip.com',
-  API_TIMEOUT: parseInt(process.env.API_TIMEOUT || '30000'),
+    ? ENV.BACKEND_URL_DEV
+    : ENV.BACKEND_URL_PROD,
+  API_TIMEOUT: 30000,
+  
+  // API Keys
+  GOOGLE_API_KEY: ENV.GOOGLE_API_KEY,
   
   // Features flags
-  ENABLE_CHATBOT: process.env.ENABLE_CHATBOT === 'true',
-  ENABLE_OFFLINE_MODE: process.env.ENABLE_OFFLINE_MODE !== 'false', // true par défaut
-  ENABLE_NOTIFICATIONS: process.env.ENABLE_NOTIFICATIONS !== 'false',
-  ENABLE_GEOLOCATION: process.env.ENABLE_GEOLOCATION !== 'false',
+  ENABLE_CHATBOT: false,
+  ENABLE_OFFLINE_MODE: true, // true par défaut
+  ENABLE_NOTIFICATIONS: true,
+  ENABLE_GEOLOCATION: true,
   
   // Debug options
-  DEBUG_SYNC: process.env.DEBUG_SYNC === 'true',
-  DEBUG_API_CALLS: process.env.DEBUG_API_CALLS === 'true',
-  DEBUG_WATERMELON: process.env.DEBUG_WATERMELON === 'true',
+  DEBUG_SYNC: ENV.DEBUG_SYNC || __DEV__,
+  DEBUG_API_CALLS: ENV.DEBUG_API_CALLS || __DEV__,
+  DEBUG_WATERMELON: ENV.DEBUG_WATERMELON || __DEV__,
 } as const;
 
 // Configuration Algolia

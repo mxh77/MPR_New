@@ -140,6 +140,20 @@ class AuthService {
   }
 
   /**
+   * Sauvegarder le token manuellement
+   */
+  async saveToken(token: string): Promise<void> {
+    await SecureStore.setItemAsync(AuthService.TOKEN_KEY, token);
+  }
+
+  /**
+   * Sauvegarder l'utilisateur manuellement
+   */
+  async saveUser(user: User): Promise<void> {
+    await SecureStore.setItemAsync(AuthService.USER_KEY, JSON.stringify(user));
+  }
+
+  /**
    * Stockage des données d'authentification
    */
   private async storeAuthData(user: User, token: string, refreshToken: string): Promise<void> {

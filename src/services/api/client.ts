@@ -56,16 +56,13 @@ const createApiClient = (): AxiosInstance => {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
+    // Support des cookies pour l'authentification
+    withCredentials: true,
   });
 
-  // Intercepteur de requête pour ajouter le token d'authentification
+  // Intercepteur de requête pour le logging (cookies gérés automatiquement)
   client.interceptors.request.use(
     async (config) => {
-      const token = await getAuthToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
       if (ENV_CONFIG.DEBUG_API_CALLS) {
         console.log('API Request:', {
           method: config.method,

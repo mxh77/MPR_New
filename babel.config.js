@@ -3,20 +3,18 @@ module.exports = function (api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      // Plugin pour WatermelonDB
-      '@babel/plugin-proposal-decorators',
+      // Plugin pour WatermelonDB decorators avec les bonnes options
+      [
+        '@babel/plugin-proposal-decorators',
+        {
+          legacy: true, // Utilise l'ancienne syntaxe pour la compatibilité
+        },
+      ],
       [
         '@babel/plugin-transform-runtime',
         {
           helpers: true,
           regenerator: false,
-        },
-      ],
-      // Plugin pour react-native-reanimated
-      [
-        'react-native-reanimated/plugin',
-        {
-          relativeSourceLocation: true,
         },
       ],
       // Plugin pour styled-components
@@ -27,6 +25,8 @@ module.exports = function (api) {
           fileName: false,
         },
       ],
+      // Plugin pour react-native-reanimated (doit être en dernier)
+      'react-native-reanimated/plugin',
     ],
   };
 };

@@ -19,10 +19,14 @@ import {
   SyncQueue,
 } from './models';
 
-// Configuration de l'adaptateur SQLite
+// Configuration de l'adaptateur SQLite pour Expo Dev Client
 const adapter = new SQLiteAdapter({
   dbName: DATABASE_CONFIG.name,
   schema,
+  jsi: true, // Utilise JSI pour de meilleures performances
+  onSetUpError: (error) => {
+    console.error('❌ Erreur configuration WatermelonDB:', error);
+  },
 });
 
 // Initialisation de la base de données

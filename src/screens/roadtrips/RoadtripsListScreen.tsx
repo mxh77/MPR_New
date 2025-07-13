@@ -1,48 +1,92 @@
 /**
  * Écran de liste des roadtrips
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts';
+import { useRoadtrips } from '../../hooks';
+import { testConnection, testEnvironment, testApiEndpoints } from '../../services/api/test';
 
 export const RoadtripsListScreen: React.FC = () => {
   const { theme } = useTheme();
+  const { roadtrips, loading, error, createRoadtrip, fetchRoadtrips } = useRoadtrips();
+  const [isCreating, setIsCreating] = useState(false);
 
-  // Données factices pour l'instant
-  const roadtrips = [
-    {
-      id: '1',
-      title: 'Tour des Alpes',
-      description: 'Un roadtrip magique à travers les plus beaux sommets',
-      status: 'En cours',
-      duration: '7 jours',
-      activitiesCount: 12,
-    },
-    {
-      id: '2',
-      title: 'Côte d\'Azur',
-      description: 'Découverte des plus belles plages de la Méditerranée',
-      status: 'Planifié',
-      duration: '5 jours',
-      activitiesCount: 8,
-    },
-    {
-      id: '3',
-      title: 'Châteaux de la Loire',
-      description: 'Voyage culturel à travers l\'histoire de France',
-      status: 'Terminé',
-      duration: '4 jours',
-      activitiesCount: 6,
-    },
-  ];
+  // Auto-load roadtrips on mount
+  React.useEffect(() => {
+    fetchRoadtrips();
+    testEnvironment();
+  }, []);
+
+  const handleCreateTestRoadtrip = async () => {
+    setIsCreating(true);
+    try {
+      const testRoadtrip = {
+        title: 'Test Roadtrip',
+        description: 'Roadtrip de test créé avec WatermelonDB',
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString(),
+        participants: 1
+      };
+
+      const result = await createRoadtrip(testRoadtrip);
+      if (result) {
+        Alert.alert('Succès', 'Roadtrip de test créé avec WatermelonDB !');
+      } else {
+        Alert.alert('Erreur', 'Impossible de créer le roadtrip');
+      }
+    } catch (err) {
+      console.error('Erreur création test:', err);
+      Alert.alert('Erreur', 'Erreur lors de la création du roadtrip de test');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleTestAPI = async () => {
+    try {
+      console.log('🧪 Test de connexion API...');
+      const result = await testConnection();
+      
+      if (result.status === 'ok') {
+        Alert.alert('✅ Connexion OK', `Backend accessible: ${result.message}`);
+      } else {
+        Alert.alert('❌ Connexion échouée', result.message);
+      }
+    } catch (err) {
+      console.error('Erreur test API:', err);
+      Alert.alert('❌ Erreur', 'Impossible de tester la connexion');
+    }
+  };
+
+  const handleTestEndpoints = async () => {
+    try {
+      console.log('🔍 Test des endpoints API...');
+      const results = await testApiEndpoints();
+      
+      let message = 'Résultats des tests:\n\n';
+      Object.entries(results).forEach(([endpoint, result]) => {
+        const status = result.status === 200 ? '✅' : '❌';
+        const type = result.isJson ? 'JSON' : 'HTML';
+        message += `${status} ${endpoint}: ${result.status} (${type})\n`;
+      });
+      
+      Alert.alert('🔍 Tests Endpoints', message);
+    } catch (err) {
+      console.error('Erreur test endpoints:', err);
+      Alert.alert('❌ Erreur', 'Impossible de tester les endpoints');
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -57,25 +101,24 @@ export const RoadtripsListScreen: React.FC = () => {
     }
   };
 
-  const renderRoadtrip = ({ item }: { item: typeof roadtrips[0] }) => (
+  const renderRoadtrip = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{item.title}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status}</Text>
-        </View>
       </View>
       
       <Text style={styles.cardDescription}>{item.description}</Text>
       
       <View style={styles.cardFooter}>
         <View style={styles.infoItem}>
-          <Ionicons name="time" size={16} color={theme.colors.textSecondary} />
-          <Text style={styles.infoText}>{item.duration}</Text>
+          <Ionicons name="calendar" size={16} color={theme.colors.textSecondary} />
+          <Text style={styles.infoText}>
+            {new Date(item.startDate).toLocaleDateString()}
+          </Text>
         </View>
         <View style={styles.infoItem}>
-          <Ionicons name="list" size={16} color={theme.colors.textSecondary} />
-          <Text style={styles.infoText}>{item.activitiesCount} activités</Text>
+          <Ionicons name="people" size={16} color={theme.colors.textSecondary} />
+          <Text style={styles.infoText}>{item.participants} participant(s)</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -105,6 +148,28 @@ export const RoadtripsListScreen: React.FC = () => {
       height: 40,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    errorContainer: {
+      backgroundColor: theme.colors.warning + '20',
+      padding: 16,
+      marginHorizontal: 20,
+      borderRadius: 8,
+      marginBottom: 16,
+    },
+    errorText: {
+      color: theme.colors.warning,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: theme.colors.textSecondary,
     },
     list: {
       paddingHorizontal: 20,
@@ -187,12 +252,45 @@ export const RoadtripsListScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Mes Roadtrips</Text>
-        <TouchableOpacity style={styles.addButton}>
-          <Ionicons name="add" size={24} color={theme.colors.white} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity 
+            style={styles.addButton} 
+            onPress={handleTestAPI}
+          >
+            <Ionicons name="cloud" size={20} color={theme.colors.white} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.addButton} 
+            onPress={handleTestEndpoints}
+          >
+            <Ionicons name="search" size={20} color={theme.colors.white} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.addButton} 
+            onPress={handleCreateTestRoadtrip}
+            disabled={isCreating}
+          >
+            {isCreating ? (
+              <ActivityIndicator size={20} color={theme.colors.white} />
+            ) : (
+              <Ionicons name="add" size={24} color={theme.colors.white} />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {roadtrips.length > 0 ? (
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Erreur: {error}</Text>
+        </View>
+      )}
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Chargement des roadtrips...</Text>
+        </View>
+      ) : roadtrips.length > 0 ? (
         <FlatList
           data={roadtrips}
           renderItem={renderRoadtrip}

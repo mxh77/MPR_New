@@ -1,159 +1,223 @@
 /**
- * Hook pour gérer les données des roadtrips
+ * Hook pour la gestion des roadtrips avec WatermelonDB
  */
-import { useState, useEffect, useCallback } from 'react';
-import { useDatabase } from '../contexts';
+import { useState, useCallback } from 'react';
+import { useDatabase } from '../contexts/DatabaseContext';
 import { Roadtrip } from '../services/database/models';
-import { syncService } from '../services';
+import { Q } from '@nozbe/watermelondb';
+
+interface RoadtripData {
+  id: string;
+  title: string;
+  description?: string;
+  startDate: number;
+  endDate: number;
+  userId: string;
+  isPublic: boolean;
+  thumbnail?: string;
+  totalSteps: number;
+  totalDistance?: number;
+  estimatedDuration?: number;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 export const useRoadtrips = () => {
-  const { database } = useDatabase();
-  const [roadtrips, setRoadtrips] = useState<Roadtrip[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { database, isReady } = useDatabase();
+  const [roadtrips, setRoadtrips] = useState<RoadtripData[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Charger les roadtrips
-  const loadRoadtrips = useCallback(async () => {
-    if (!database) return;
-
+  const fetchRoadtrips = useCallback(async () => {
+    if (!isReady || !database) return;
+    
     try {
       setLoading(true);
       setError(null);
-
+      
+      console.log('📍 Chargement des roadtrips depuis WatermelonDB...');
+      
       const roadtripsCollection = database.get<Roadtrip>('roadtrips');
-      const roadtripsList = await roadtripsCollection
-        .query()
-        .fetch();
-
-      setRoadtrips(roadtripsList);
+      const roadtripRecords = await roadtripsCollection.query().fetch();
+      
+      const roadtripsData: RoadtripData[] = roadtripRecords.map(record => ({
+        id: record.id,
+        title: record.title,
+        description: record.description,
+        startDate: record.startDate,
+        endDate: record.endDate,
+        userId: record.userId,
+        isPublic: record.isPublic,
+        thumbnail: record.thumbnail,
+        totalSteps: record.totalSteps,
+        totalDistance: record.totalDistance,
+        estimatedDuration: record.estimatedDuration,
+        tags: record.tags,
+        createdAt: record.createdAt.toISOString(),
+        updatedAt: record.updatedAt.toISOString(),
+      }));
+      
+      setRoadtrips(roadtripsData);
+      console.log(`✅ ${roadtripsData.length} roadtrips chargés`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement');
+      console.error('❌ Erreur lors du chargement:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
     }
-  }, [database]);
+  }, [isReady, database]);
 
-  // Créer un nouveau roadtrip
-  const createRoadtrip = useCallback(async (roadtripData: {
-    title: string;
-    description?: string;
-    startDate: Date;
-    endDate: Date;
-    userId: string;
-  }) => {
-    if (!database) throw new Error('Database not available');
-
+  const createRoadtrip = useCallback(async (roadtripData: Omit<RoadtripData, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!isReady || !database) return null;
+    
     try {
-      const roadtripsCollection = database.get<Roadtrip>('roadtrips');
+      setLoading(true);
+      setError(null);
       
+      console.log('📍 Création roadtrip:', roadtripData.title);
+      
+      const roadtripsCollection = database.get<Roadtrip>('roadtrips');
       const newRoadtrip = await database.write(async () => {
         return await roadtripsCollection.create(roadtrip => {
           roadtrip.title = roadtripData.title;
-          roadtrip.description = roadtripData.description || '';
-          roadtrip.startDate = roadtripData.startDate.getTime();
-          roadtrip.endDate = roadtripData.endDate.getTime();
+          roadtrip.description = roadtripData.description;
+          roadtrip.startDate = roadtripData.startDate;
+          roadtrip.endDate = roadtripData.endDate;
           roadtrip.userId = roadtripData.userId;
-          roadtrip.isPublic = false;
-          roadtrip.totalSteps = 0;
-          roadtrip.tagsJson = JSON.stringify([]);
+          roadtrip.isPublic = roadtripData.isPublic;
+          roadtrip.thumbnail = roadtripData.thumbnail;
+          roadtrip.totalSteps = roadtripData.totalSteps;
+          roadtrip.totalDistance = roadtripData.totalDistance;
+          roadtrip.estimatedDuration = roadtripData.estimatedDuration;
+          roadtrip.tags = roadtripData.tags;
         });
       });
-
-      // Ajouter à la queue de synchronisation
-      await syncService.addToSyncQueue(
-        'roadtrips',
-        newRoadtrip.id,
-        'create',
-        newRoadtrip.toInterface()
-      );
-
-      // Recharger les roadtrips
-      await loadRoadtrips();
-
-      return newRoadtrip;
+      
+      const newRoadtripData: RoadtripData = {
+        id: newRoadtrip.id,
+        title: newRoadtrip.title,
+        description: newRoadtrip.description,
+        startDate: newRoadtrip.startDate,
+        endDate: newRoadtrip.endDate,
+        userId: newRoadtrip.userId,
+        isPublic: newRoadtrip.isPublic,
+        thumbnail: newRoadtrip.thumbnail,
+        totalSteps: newRoadtrip.totalSteps,
+        totalDistance: newRoadtrip.totalDistance,
+        estimatedDuration: newRoadtrip.estimatedDuration,
+        tags: newRoadtrip.tags,
+        createdAt: newRoadtrip.createdAt.toISOString(),
+        updatedAt: newRoadtrip.updatedAt.toISOString(),
+      };
+      
+      setRoadtrips(prev => [...prev, newRoadtripData]);
+      console.log('✅ Roadtrip créé:', newRoadtripData.id);
+      return newRoadtripData;
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la création');
+      console.error('❌ Erreur lors de la création:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      return null;
+    } finally {
+      setLoading(false);
     }
-  }, [database, loadRoadtrips]);
+  }, [isReady, database]);
 
-  // Mettre à jour un roadtrip
-  const updateRoadtrip = useCallback(async (
-    roadtripId: string,
-    updates: Partial<{
-      title: string;
-      description: string;
-      startDate: Date;
-      endDate: Date;
-      isPublic: boolean;
-    }>
-  ) => {
-    if (!database) throw new Error('Database not available');
-
+  const updateRoadtrip = useCallback(async (roadtripId: string, updates: Partial<RoadtripData>) => {
+    if (!isReady || !database) return null;
+    
     try {
-      const roadtrip = await database.get<Roadtrip>('roadtrips').find(roadtripId);
+      setLoading(true);
+      setError(null);
+      
+      console.log('📍 Mise à jour roadtrip:', roadtripId);
+      
+      const roadtripsCollection = database.get<Roadtrip>('roadtrips');
+      const roadtripRecord = await roadtripsCollection.find(roadtripId);
       
       const updatedRoadtrip = await database.write(async () => {
-        return await roadtrip.update(roadtripRecord => {
-          if (updates.title !== undefined) roadtripRecord.title = updates.title;
-          if (updates.description !== undefined) roadtripRecord.description = updates.description;
-          if (updates.startDate !== undefined) roadtripRecord.startDate = updates.startDate.getTime();
-          if (updates.endDate !== undefined) roadtripRecord.endDate = updates.endDate.getTime();
-          if (updates.isPublic !== undefined) roadtripRecord.isPublic = updates.isPublic;
+        return await roadtripRecord.update(roadtrip => {
+          if (updates.title !== undefined) roadtrip.title = updates.title;
+          if (updates.description !== undefined) roadtrip.description = updates.description;
+          if (updates.startDate !== undefined) roadtrip.startDate = updates.startDate;
+          if (updates.endDate !== undefined) roadtrip.endDate = updates.endDate;
+          if (updates.userId !== undefined) roadtrip.userId = updates.userId;
+          if (updates.isPublic !== undefined) roadtrip.isPublic = updates.isPublic;
+          if (updates.thumbnail !== undefined) roadtrip.thumbnail = updates.thumbnail;
+          if (updates.totalSteps !== undefined) roadtrip.totalSteps = updates.totalSteps;
+          if (updates.totalDistance !== undefined) roadtrip.totalDistance = updates.totalDistance;
+          if (updates.estimatedDuration !== undefined) roadtrip.estimatedDuration = updates.estimatedDuration;
+          if (updates.tags !== undefined) roadtrip.tags = updates.tags;
         });
       });
-
-      // Ajouter à la queue de synchronisation
-      await syncService.addToSyncQueue(
-        'roadtrips',
-        roadtripId,
-        'update',
-        updatedRoadtrip.toInterface()
+      
+      const updatedData: RoadtripData = {
+        id: updatedRoadtrip.id,
+        title: updatedRoadtrip.title,
+        description: updatedRoadtrip.description,
+        startDate: updatedRoadtrip.startDate,
+        endDate: updatedRoadtrip.endDate,
+        userId: updatedRoadtrip.userId,
+        isPublic: updatedRoadtrip.isPublic,
+        thumbnail: updatedRoadtrip.thumbnail,
+        totalSteps: updatedRoadtrip.totalSteps,
+        totalDistance: updatedRoadtrip.totalDistance,
+        estimatedDuration: updatedRoadtrip.estimatedDuration,
+        tags: updatedRoadtrip.tags,
+        createdAt: updatedRoadtrip.createdAt.toISOString(),
+        updatedAt: updatedRoadtrip.updatedAt.toISOString(),
+      };
+      
+      setRoadtrips(prev => 
+        prev.map(roadtrip => 
+          roadtrip.id === roadtripId ? updatedData : roadtrip
+        )
       );
-
-      // Recharger les roadtrips
-      await loadRoadtrips();
-
-      return updatedRoadtrip;
+      
+      console.log('✅ Roadtrip mis à jour:', roadtripId);
+      return updatedData;
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la mise à jour');
+      console.error('❌ Erreur lors de la mise à jour:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      return null;
+    } finally {
+      setLoading(false);
     }
-  }, [database, loadRoadtrips]);
+  }, [isReady, database]);
 
-  // Supprimer un roadtrip
   const deleteRoadtrip = useCallback(async (roadtripId: string) => {
-    if (!database) throw new Error('Database not available');
-
+    if (!isReady || !database) return false;
+    
     try {
-      const roadtrip = await database.get<Roadtrip>('roadtrips').find(roadtripId);
+      setLoading(true);
+      setError(null);
+      
+      console.log('📍 Suppression roadtrip:', roadtripId);
+      
+      const roadtripsCollection = database.get<Roadtrip>('roadtrips');
+      const roadtripRecord = await roadtripsCollection.find(roadtripId);
       
       await database.write(async () => {
-        await roadtrip.markAsDeleted();
+        await roadtripRecord.markAsDeleted();
       });
-
-      // Ajouter à la queue de synchronisation
-      await syncService.addToSyncQueue(
-        'roadtrips',
-        roadtripId,
-        'delete'
-      );
-
-      // Recharger les roadtrips
-      await loadRoadtrips();
+      
+      setRoadtrips(prev => prev.filter(roadtrip => roadtrip.id !== roadtripId));
+      console.log('✅ Roadtrip supprimé:', roadtripId);
+      return true;
     } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Erreur lors de la suppression');
+      console.error('❌ Erreur lors de la suppression:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      return false;
+    } finally {
+      setLoading(false);
     }
-  }, [database, loadRoadtrips]);
-
-  // Charger les roadtrips au démarrage
-  useEffect(() => {
-    loadRoadtrips();
-  }, [loadRoadtrips]);
+  }, [isReady, database]);
 
   return {
     roadtrips,
     loading,
     error,
-    loadRoadtrips,
+    fetchRoadtrips,
     createRoadtrip,
     updateRoadtrip,
     deleteRoadtrip,
