@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts';
 import { useRoadtripsWithApi } from '../../hooks';
+import { RoadtripMenu } from '../../components/common/RoadtripMenu';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
@@ -62,6 +63,16 @@ const cardStyles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuButton: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -112,10 +123,11 @@ const cardStyles = StyleSheet.create({
 interface RoadtripCardProps {
   item: any;
   onPress: () => void;
+  onMenuPress: () => void;
   theme: any;
 }
 
-const RoadtripCard: React.FC<RoadtripCardProps> = ({ item, onPress, theme }) => {
+const RoadtripCard: React.FC<RoadtripCardProps> = ({ item, onPress, onMenuPress, theme }) => {
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('fr-FR', {
       day: 'numeric',
@@ -163,6 +175,19 @@ const RoadtripCard: React.FC<RoadtripCardProps> = ({ item, onPress, theme }) => 
         <View style={[cardStyles.syncBadge, { backgroundColor: theme.colors.background + 'CC' }]}>
           {getSyncIcon()}
         </View>
+
+        {/* Menu Button */}
+        <TouchableOpacity 
+          style={[cardStyles.menuButton, { backgroundColor: theme.colors.background + 'CC' }]}
+          onPress={(e) => {
+            e.stopPropagation();
+            onMenuPress();
+          }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="ellipsis-vertical" size={16} color={theme.colors.text} />
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -222,6 +247,7 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
     isOnline,
     fetchRoadtrips,
     createRoadtrip,
+    deleteRoadtrip,
     syncWithApi,
     refreshRoadtrips, // Nouvelle fonction
     totalRoadtrips,
@@ -230,6 +256,9 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
   } = useRoadtripsWithApi();
   
   const [refreshing, setRefreshing] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedRoadtrip, setSelectedRoadtrip] = useState<any>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Refresh à chaque focus de l'écran (sans force sync)
   useFocusEffect(
@@ -278,6 +307,66 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
     
     await syncWithApi();
     Alert.alert('✅ Synchronisation', 'Synchronisation terminée');
+  };
+
+  const handleRoadtripMenu = (roadtrip: any) => {
+    setSelectedRoadtrip(roadtrip);
+    setMenuVisible(true);
+  };
+
+  const handleMenuAction = async (actionId: string) => {
+    if (!selectedRoadtrip) return;
+
+    try {
+      setActionLoading(actionId);
+
+      switch (actionId) {
+        case 'view':
+          navigation.navigate('RoadtripDetail', { roadtripId: selectedRoadtrip.id });
+          break;
+        
+        case 'edit':
+          Alert.alert('Fonctionnalité', 'Édition du roadtrip - À implémenter');
+          break;
+        
+        case 'duplicate':
+          const duplicatedRoadtrip = {
+            title: `${selectedRoadtrip.title} (Copie)`,
+            description: selectedRoadtrip.description,
+            startDate: new Date(selectedRoadtrip.startDate),
+            endDate: new Date(selectedRoadtrip.endDate),
+            startLocation: selectedRoadtrip.startLocation,
+            endLocation: selectedRoadtrip.endLocation,
+            currency: selectedRoadtrip.currency,
+          };
+          
+          const result = await createRoadtrip(duplicatedRoadtrip);
+          if (result) {
+            Alert.alert('✅ Succès', 'Roadtrip dupliqué avec succès !');
+          } else {
+            Alert.alert('❌ Erreur', 'Impossible de dupliquer le roadtrip');
+          }
+          break;
+        
+        case 'share':
+          Alert.alert('Fonctionnalité', 'Partage du roadtrip - À implémenter');
+          break;
+        
+        case 'delete':
+          const success = await deleteRoadtrip(selectedRoadtrip.id);
+          if (success) {
+            Alert.alert('✅ Succès', 'Roadtrip supprimé avec succès');
+          } else {
+            Alert.alert('❌ Erreur', 'Impossible de supprimer le roadtrip');
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Erreur action menu:', error);
+      Alert.alert('❌ Erreur', 'Une erreur est survenue');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const renderHeader = () => (
@@ -381,6 +470,7 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
         console.log('Navigation vers roadtrip:', item.id);
         navigation.navigate('RoadtripDetail', { roadtripId: item.id });
       }}
+      onMenuPress={() => handleRoadtripMenu(item)}
     />
   );
 
@@ -614,6 +704,15 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
       ) : (
         renderEmpty()
       )}
+
+      {/* Menu contextuel */}
+      <RoadtripMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        onAction={handleMenuAction}
+        roadtripTitle={selectedRoadtrip?.title || ''}
+        loadingAction={actionLoading}
+      />
     </SafeAreaView>
   );
 };

@@ -4,6 +4,7 @@
 export { Button } from './Button';
 export { Input } from './Input';
 export { Card } from './Card';
+export { RoadtripMenu } from './RoadtripMenu';
 
 // Types
 export type { ButtonProps } from './Button';
