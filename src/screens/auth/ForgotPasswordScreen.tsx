@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../components/navigation/AuthNavigator';
 
-import { useTheme } from '../../contexts';
+import { useTheme, useAuth } from '../../contexts';
 import { useForm } from '../../hooks';
 import { Button, Input, Card } from '../../components/common';
 
@@ -22,6 +22,7 @@ type ForgotPasswordScreenNavigationProp = NativeStackNavigationProp<AuthStackPar
 
 export const ForgotPasswordScreen: React.FC = () => {
   const { theme } = useTheme();
+  const { forgotPassword, isLoading, error, clearError } = useAuth();
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
 
   // Utilisation du hook useForm avec validation
@@ -30,7 +31,6 @@ export const ForgotPasswordScreen: React.FC = () => {
     { email: { required: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ } }
   );
 
-  const [isLoading, setIsLoading] = React.useState(false);
   const [isEmailSent, setIsEmailSent] = React.useState(false);
 
   const handleResetPassword = async () => {
@@ -38,15 +38,12 @@ export const ForgotPasswordScreen: React.FC = () => {
       return;
     }
 
-    setIsLoading(true);
     try {
-      // TODO: Implémenter la logique de réinitialisation
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulation
+      await forgotPassword(formState.email?.value || '');
       setIsEmailSent(true);
     } catch (error) {
       console.error('Erreur réinitialisation:', error);
-    } finally {
-      setIsLoading(false);
+      // L'erreur est déjà gérée par le contexte
     }
   };
 
@@ -76,6 +73,16 @@ export const ForgotPasswordScreen: React.FC = () => {
     },
     formContainer: {
       marginBottom: 24,
+    },
+    errorContainer: {
+      padding: 16,
+      marginBottom: 16,
+      backgroundColor: theme.colors.warning + '20',
+    },
+    errorText: {
+      fontSize: 14,
+      color: theme.colors.warning,
+      textAlign: 'center',
     },
     successContainer: {
       alignItems: 'center',
@@ -123,13 +130,22 @@ export const ForgotPasswordScreen: React.FC = () => {
             Saisissez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
           </Text>
 
+          {error && (
+            <Card style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </Card>
+          )}
+
           <View style={styles.formContainer}>
             <Input
               label="Email"
               placeholder="votre@email.com"
               leftIcon="mail"
               value={formState.email?.value || ''}
-              onChangeText={(text) => updateField('email', text)}
+              onChangeText={(text) => {
+                updateField('email', text);
+                if (error) clearError();
+              }}
               error={formState.email?.error}
               keyboardType="email-address"
               autoCapitalize="none"

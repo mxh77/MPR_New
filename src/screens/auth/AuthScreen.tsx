@@ -16,11 +16,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { AuthStackParamList } from '../../components/navigation/AuthNavigator';
 import { useTheme, useAuth } from '../../contexts';
+
+type AuthScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 export const AuthScreen: React.FC = () => {
   const { theme } = useTheme();
   const { login, register, isLoading, error, clearError } = useAuth();
+  const navigation = useNavigation<AuthScreenNavigationProp>();
   
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [formData, setFormData] = useState({
@@ -180,6 +186,15 @@ export const AuthScreen: React.FC = () => {
       color: theme.colors.white,
       fontSize: 16,
       fontWeight: '600',
+    },
+    forgotPasswordButton: {
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    forgotPasswordText: {
+      color: theme.colors.primary,
+      fontSize: 14,
+      fontWeight: '500',
     },
     switchModeContainer: {
       flexDirection: 'row',
@@ -355,6 +370,16 @@ export const AuthScreen: React.FC = () => {
                 </Text>
               )}
             </TouchableOpacity>
+
+            {/* Forgot Password Link (Login only) */}
+            {!isRegisterMode && (
+              <TouchableOpacity 
+                style={styles.forgotPasswordButton}
+                onPress={() => navigation.navigate('ForgotPassword')}
+              >
+                <Text style={styles.forgotPasswordText}>Mot de passe oublié ?</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Switch Mode */}

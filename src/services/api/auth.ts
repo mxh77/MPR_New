@@ -37,6 +37,14 @@ export interface AuthStatusResponse {
   isAuthenticated: boolean;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
 /**
  * Connexion utilisateur
  */
@@ -159,5 +167,35 @@ export const checkAuthStatus = async (): Promise<AuthStatusResponse> => {
     return {
       isAuthenticated: false
     };
+  }
+};
+
+/**
+ * Demande de réinitialisation de mot de passe
+ */
+export const forgotPassword = async (email: string): Promise<ForgotPasswordResponse> => {
+  try {
+    if (ENV_CONFIG.DEBUG_API_CALLS) {
+      console.log('📧 Forgot password request for:', email);
+    }
+
+    const response = await apiClient.post<ForgotPasswordResponse>('/auth/forgot-password', {
+      email
+    });
+    
+    if (ENV_CONFIG.DEBUG_API_CALLS) {
+      console.log('✅ Forgot password response:', response.data.message);
+    }
+
+    return response.data;
+  } catch (error: any) {
+    if (ENV_CONFIG.DEBUG_API_CALLS) {
+      console.error('❌ Forgot password error:', error.response?.data || error.message);
+    }
+    
+    throw new Error(
+      error.response?.data?.message || 
+      'Erreur lors de la demande de réinitialisation'
+    );
   }
 };

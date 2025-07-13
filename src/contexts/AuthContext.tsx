@@ -3,7 +3,7 @@
  */
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { authService } from '../services';
-import { loginUser, registerUser, checkAuthStatus, type AuthUser } from '../services/api/auth';
+import { loginUser, registerUser, checkAuthStatus, forgotPassword, type AuthUser } from '../services/api/auth';
 import { ENV_CONFIG } from '../config';
 import type { User, RegisterData } from '../types';
 
@@ -20,6 +20,7 @@ interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -30,6 +31,7 @@ type AuthAction =
   | { type: 'AUTH_ERROR'; payload: string }
   | { type: 'AUTH_LOGOUT' }
   | { type: 'CLEAR_ERROR' }
+  | { type: 'FORGOT_PASSWORD_SUCCESS' }
   | { type: 'RESTORE_SESSION'; payload: { user: User; token: string } };
 
 // État initial
@@ -84,6 +86,13 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case 'CLEAR_ERROR':
       return {
         ...state,
+        error: null,
+      };
+
+    case 'FORGOT_PASSWORD_SUCCESS':
+      return {
+        ...state,
+        isLoading: false,
         error: null,
       };
 
@@ -224,6 +233,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Fonction de mot de passe oublié
+  const forgotPasswordHandler = async (email: string): Promise<void> => {
+    dispatch({ type: 'AUTH_START' });
+
+    try {
+      await forgotPassword(email);
+      
+      // Réinitialiser le state après succès - arrêter le loading
+      dispatch({ type: 'FORGOT_PASSWORD_SUCCESS' });
+      
+      if (ENV_CONFIG.DEBUG_API_CALLS) {
+        console.log('✅ Forgot password email sent successfully');
+      }
+    } catch (error) {
+      dispatch({
+        type: 'AUTH_ERROR',
+        payload: error instanceof Error ? error.message : 'Erreur lors de l\'envoi de l\'email',
+      });
+      throw error;
+    }
+  };
+
   // Effacer l'erreur
   const clearError = (): void => {
     dispatch({ type: 'CLEAR_ERROR' });
@@ -255,6 +286,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
+    forgotPassword: forgotPasswordHandler,
     clearError,
   };
 
