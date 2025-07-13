@@ -7,7 +7,7 @@ import { useDatabase } from '../contexts/DatabaseContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNetworkStatus } from './useNetworkStatus';
 import { Roadtrip } from '../services/database/models';
-import { roadtripsApiService, ApiRoadtrip } from '../services/api/roadtrips';
+import { roadtripsApiService, ApiRoadtrip, extractThumbnailUrl } from '../services/api/roadtrips';
 import { Q } from '@nozbe/watermelondb';
 
 interface RoadtripData {
@@ -137,6 +137,11 @@ export const useRoadtripsWithApi = () => {
       // Pour chaque roadtrip de l'API
       for (const apiRoadtrip of apiRoadtrips) {
         try {
+          // Debug: afficher la structure de la thumbnail
+          console.log(`🖼️ Thumbnail pour ${apiRoadtrip.name}:`, apiRoadtrip.thumbnail);
+          const thumbnailUrl = extractThumbnailUrl(apiRoadtrip.thumbnail);
+          console.log(`🖼️ URL extraite:`, thumbnailUrl);
+          
           // Vérifier s'il existe déjà localement par server_id
           const existingRecord = existingLocalRoadtrips.find(
             local => local.serverId === apiRoadtrip._id
@@ -160,7 +165,7 @@ export const useRoadtripsWithApi = () => {
                 roadtrip.currency = apiRoadtrip.currency || 'EUR';
                 roadtrip.userId = user._id;
                 roadtrip.isPublic = false;
-                roadtrip.thumbnail = apiRoadtrip.thumbnail || undefined;
+                roadtrip.thumbnail = extractThumbnailUrl(apiRoadtrip.thumbnail);
                 roadtrip.photos = apiRoadtrip.photos || [];
                 roadtrip.documents = apiRoadtrip.documents || [];
                 roadtrip.totalSteps = apiRoadtrip.steps ? apiRoadtrip.steps.length : 0;

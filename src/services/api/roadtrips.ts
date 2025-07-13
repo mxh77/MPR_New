@@ -5,6 +5,23 @@
 import { apiClient } from './client';
 import { Roadtrip } from '../../types';
 
+/**
+ * Extraire l'URL de la thumbnail depuis l'objet API
+ */
+export const extractThumbnailUrl = (thumbnail: string | { url?: string; data?: string } | null | undefined): string | undefined => {
+  if (!thumbnail) return undefined;
+  
+  if (typeof thumbnail === 'string') {
+    return thumbnail;
+  }
+  
+  if (typeof thumbnail === 'object' && thumbnail.url) {
+    return thumbnail.url;
+  }
+  
+  return undefined;
+};
+
 export interface ApiRoadtrip {
   _id: string;
   userId: string;
@@ -17,7 +34,7 @@ export interface ApiRoadtrip {
   notes?: string;
   photos: string[];
   documents: string[];
-  thumbnail?: string;
+  thumbnail?: string | { url?: string; data?: string } | null;
   steps: string[];
   createdAt: string;
   updatedAt: string;
@@ -36,7 +53,7 @@ export interface ApiRoadtripDetailed {
   notes?: string;
   photos: string[];
   documents: string[];
-  thumbnail?: string;
+  thumbnail?: string | { url?: string; data?: string } | null;
   steps: ApiStep[];
   createdAt: string;
   updatedAt: string;
@@ -219,7 +236,7 @@ class RoadtripsApiService {
       currency: apiRoadtrip.currency,
       userId: apiRoadtrip.userId,
       isPublic: false, // Valeur par défaut, l'API ne semble pas avoir ce champ
-      thumbnail: apiRoadtrip.thumbnail,
+      thumbnail: extractThumbnailUrl(apiRoadtrip.thumbnail),
       totalSteps: apiRoadtrip.steps.length,
       totalDistance: undefined, // Sera calculé côté client
       estimatedDuration: undefined, // Sera calculé côté client

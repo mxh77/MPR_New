@@ -26,6 +26,13 @@ export const ENV_CONFIG = {
   DEBUG_WATERMELON: ENV.DEBUG_WATERMELON || __DEV__,
 } as const;
 
+// Configuration développement (UNIQUEMENT en mode debug)
+export const DEV_CONFIG = {
+  PREFILL_LOGIN: __DEV__, // Active le pré-remplissage en développement
+  DEFAULT_EMAIL: 'maxime.heron@gmail.com',
+  DEFAULT_PASSWORD: '1234',
+} as const;
+
 // Configuration Algolia
 export const ALGOLIA_CONFIG = {
   APP_ID: process.env.ALGOLIA_APP_ID || '',

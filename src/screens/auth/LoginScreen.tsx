@@ -19,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../components/navigation/AuthNavigator';
 import { useTheme, useAuth } from '../../contexts';
+import { DEV_CONFIG } from '../../config';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -32,8 +33,8 @@ export const LoginScreen: React.FC = () => {
     firstName: '',
     lastName: '',
     username: '',
-    email: '',
-    password: '',
+    email: DEV_CONFIG.PREFILL_LOGIN ? DEV_CONFIG.DEFAULT_EMAIL : '',
+    password: DEV_CONFIG.PREFILL_LOGIN ? DEV_CONFIG.DEFAULT_PASSWORD : '',
   });
 
   const updateField = (field: keyof typeof formData, value: string) => {
