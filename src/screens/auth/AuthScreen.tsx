@@ -26,6 +26,7 @@ export const AuthScreen: React.FC = () => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -54,6 +55,16 @@ export const AuthScreen: React.FC = () => {
         return false;
       }
       
+      if (!formData.username.trim()) {
+        Alert.alert('Erreur', 'Veuillez saisir un pseudo');
+        return false;
+      }
+      
+      if (formData.username.length < 3) {
+        Alert.alert('Erreur', 'Le pseudo doit contenir au moins 3 caractères');
+        return false;
+      }
+      
       if (formData.password !== formData.confirmPassword) {
         Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
         return false;
@@ -78,6 +89,7 @@ export const AuthScreen: React.FC = () => {
           lastName: formData.lastName,
           email: formData.email,
           password: formData.password,
+          username: formData.username,
         });
         Alert.alert('Succès', 'Inscription réussie ! Vous êtes maintenant connecté.');
       } else {
@@ -235,30 +247,46 @@ export const AuthScreen: React.FC = () => {
           <View style={styles.form}>
             {/* Name Fields (Register only) */}
             {isRegisterMode && (
-              <View style={styles.nameRow}>
-                <View style={[styles.inputContainer, styles.nameInput]}>
-                  <Ionicons name="person" size={20} color={theme.colors.textSecondary} />
+              <>
+                <View style={styles.nameRow}>
+                  <View style={[styles.inputContainer, styles.nameInput]}>
+                    <Ionicons name="person" size={20} color={theme.colors.textSecondary} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Prénom"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      value={formData.firstName}
+                      onChangeText={(value) => handleInputChange('firstName', value)}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                  <View style={[styles.inputContainer, styles.nameInput]}>
+                    <Ionicons name="person" size={20} color={theme.colors.textSecondary} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Nom"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      value={formData.lastName}
+                      onChangeText={(value) => handleInputChange('lastName', value)}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                </View>
+                
+                {/* Username */}
+                <View style={styles.inputContainer}>
+                  <Ionicons name="at" size={20} color={theme.colors.textSecondary} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Prénom"
+                    placeholder="Pseudo (username)"
                     placeholderTextColor={theme.colors.textSecondary}
-                    value={formData.firstName}
-                    onChangeText={(value) => handleInputChange('firstName', value)}
-                    autoCapitalize="words"
+                    value={formData.username}
+                    onChangeText={(value) => handleInputChange('username', value)}
+                    autoCapitalize="none"
+                    autoCorrect={false}
                   />
                 </View>
-                <View style={[styles.inputContainer, styles.nameInput]}>
-                  <Ionicons name="person" size={20} color={theme.colors.textSecondary} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Nom"
-                    placeholderTextColor={theme.colors.textSecondary}
-                    value={formData.lastName}
-                    onChangeText={(value) => handleInputChange('lastName', value)}
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
+              </>
             )}
 
             {/* Email */}

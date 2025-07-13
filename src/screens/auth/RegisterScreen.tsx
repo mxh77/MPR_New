@@ -66,6 +66,7 @@ export const RegisterScreen: React.FC = () => {
         password: formState.password.value,
         firstName: formState.firstName.value,
         lastName: formState.lastName.value,
+        username: formState.lastName.value, // Assuming username is same as last name for simplicity
       });
     } catch (error) {
       console.error('Erreur inscription:', error);

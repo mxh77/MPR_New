@@ -224,6 +224,7 @@ export interface RegisterData {
   password: string;
   firstName: string;
   lastName: string;
+  username: string;
 }
 
 // Résultat de synchronisation

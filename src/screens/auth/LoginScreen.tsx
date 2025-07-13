@@ -25,6 +25,7 @@ export const LoginScreen: React.FC = () => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    username: '',
     email: '',
     password: '',
   });
@@ -61,6 +62,16 @@ export const LoginScreen: React.FC = () => {
         return false;
       }
       
+      if (!formData.username.trim()) {
+        Alert.alert('Erreur', 'Le pseudo est requis');
+        return false;
+      }
+      
+      if (formData.username.length < 3) {
+        Alert.alert('Erreur', 'Le pseudo doit contenir au moins 3 caractères');
+        return false;
+      }
+      
       if (formData.password.length < 6) {
         Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
         return false;
@@ -78,6 +89,7 @@ export const LoginScreen: React.FC = () => {
         await register({
           firstName: formData.firstName,
           lastName: formData.lastName,
+          username: formData.username,
           email: formData.email,
           password: formData.password,
         });
@@ -226,6 +238,19 @@ export const LoginScreen: React.FC = () => {
                     value={formData.lastName}
                     onChangeText={(value) => updateField('lastName', value)}
                     autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Ionicons name="at-outline" size={20} color={theme.colors.textSecondary} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Pseudo (username)"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={formData.username}
+                    onChangeText={(value) => updateField('username', value)}
+                    autoCapitalize="none"
+                    autoCorrect={false}
                   />
                 </View>
               </>

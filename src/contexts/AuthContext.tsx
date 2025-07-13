@@ -181,25 +181,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'AUTH_START' });
 
     try {
-      // Appel API réel
-      const authResponse = await registerUser({
-        name: `${data.firstName} ${data.lastName}`.trim(),
+      // Appel API réel - maintenant retourne directement AuthUser
+      const authUser = await registerUser({
+        username: data.username,
         email: data.email,
         password: data.password,
       });
       
       // Convertir AuthUser vers User avec les noms spécifiés
-      const user = convertAuthUserToUser(authResponse.user, data.firstName, data.lastName);
+      const user = convertAuthUserToUser(authUser, data.firstName, data.lastName);
       
-      // Sauvegarder le token et l'utilisateur
-      await authService.saveToken(authResponse.token);
+      // Pour le token, on utilise un token factice car l'auth est basée sur cookies
+      const token = 'cookie-based-auth'; // Token factice car l'auth est basée sur cookies
+      
+      // Sauvegarder l'utilisateur
       await authService.saveUser(user);
 
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: {
           user,
-          token: authResponse.token,
+          token,
         },
       });
     } catch (error) {

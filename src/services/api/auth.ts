@@ -28,7 +28,7 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest {
-  name: string;
+  username: string;
   email: string;
   password: string;
 }
@@ -89,19 +89,44 @@ export const loginUser = async (credentials: LoginRequest): Promise<AuthUser> =>
 /**
  * Inscription utilisateur
  */
-export const registerUser = async (userData: RegisterRequest): Promise<AuthResponse> => {
+export const registerUser = async (userData: RegisterRequest): Promise<AuthUser> => {
   try {
     if (ENV_CONFIG.DEBUG_API_CALLS) {
-      console.log('📝 Register attempt:', { name: userData.name, email: userData.email });
+      console.log('📝 Register attempt:', { username: userData.username, email: userData.email });
     }
 
-    const response = await apiClient.post<AuthResponse>('/auth/register', userData);
+    // Étape 1: Register (définit le cookie)
+    const registerResponse = await apiClient.post('/auth/register', userData);
     
     if (ENV_CONFIG.DEBUG_API_CALLS) {
-      console.log('✅ Registration successful:', response.data.user.name);
+      console.log('✅ Register response:', registerResponse.data);
     }
 
-    return response.data;
+    // Étape 2: Vérifier l'authentification
+    const statusResponse = await apiClient.get<AuthStatusResponse>('/auth/status');
+    
+    if (ENV_CONFIG.DEBUG_API_CALLS) {
+      console.log('📊 Auth status response after register:', statusResponse.data);
+    }
+    
+    if (!statusResponse.data.isAuthenticated) {
+      throw new Error('Échec de l\'authentification après inscription');
+    }
+
+    // Créer un utilisateur basique basé sur les données d'inscription
+    const basicUser: AuthUser = {
+      _id: 'user_' + Date.now(),
+      name: userData.username,
+      email: userData.email,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    if (ENV_CONFIG.DEBUG_API_CALLS) {
+      console.log('✅ Registration successful with basic user:', basicUser.name);
+    }
+    
+    return basicUser;
   } catch (error: any) {
     if (ENV_CONFIG.DEBUG_API_CALLS) {
       console.error('❌ Registration failed:', error.response?.data?.msg || error.message);
