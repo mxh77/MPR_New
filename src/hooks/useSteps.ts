@@ -14,7 +14,7 @@ interface UseStepsResult {
   steps: Step[];
   loading: boolean;
   error: string | null;
-  refreshSteps: () => Promise<void>;
+  refreshSteps: (forceSync?: boolean) => Promise<void>;
   createStepOptimistic: (stepData: CreateStepRequest) => Promise<Step>;
   updateStepOptimistic: (stepId: string, stepData: UpdateStepRequest) => Promise<void>;
   deleteStepOptimistic: (stepId: string) => Promise<void>;
@@ -30,7 +30,7 @@ const convertApiStepToStep = (apiStep: ApiStep): Step => {
     roadtripId: apiStep.roadtripId,
     title: apiStep.name,
     description: apiStep.notes,
-    type: apiStep.type === 'Stage' ? 'overnight' : 'stop',
+    type: apiStep.type, // Pas de conversion, types alignés maintenant
     orderIndex: 0, // sera mis à jour par le serveur
     location: {
       latitude: apiStep.latitude,
@@ -60,10 +60,59 @@ const convertApiStepToStep = (apiStep: ApiStep): Step => {
     type: step.type,
     activitiesCount: apiStep.activities?.length || 0,
     accommodationsCount: apiStep.accommodations?.length || 0,
-    thumbnail: apiStep.thumbnail
+    thumbnail: apiStep.thumbnail,
+    thumbnailFromAPI: apiStep.thumbnail ? 'présente' : 'absente'
   });
 
   return step;
+};
+
+/**
+ * Détermine si une synchronisation avec l'API est nécessaire
+ * Stratégie offline-first : privilégier les données locales
+ */
+const shouldSynchronizeSteps = async (roadtripId: string): Promise<boolean> => {
+  try {
+    // Vérifier s'il y a des données en local
+    const stepsCollection = database.get<StepModel>('steps');
+    const localSteps = await stepsCollection
+      .query(Q.where('roadtrip_id', roadtripId))
+      .fetch();
+
+    // Si pas de données locales, synchroniser obligatoirement
+    if (localSteps.length === 0) {
+      console.log('📍 shouldSynchronizeSteps - Pas de données locales → Sync nécessaire');
+      return true;
+    }
+
+    // Vérifier la fraîcheur des données (dernière sync il y a plus de 5 minutes)
+    const lastStep = localSteps[0];
+    const lastSyncTime = lastStep.lastSyncAt?.getTime() || 0;
+    const now = Date.now();
+    const fiveMinutesAgo = now - (5 * 60 * 1000);
+
+    if (lastSyncTime < fiveMinutesAgo) {
+      console.log('📍 shouldSynchronizeSteps - Données anciennes (>5min) → Sync nécessaire');
+      return true;
+    }
+
+    // Vérifier s'il y a des éléments en attente de synchronisation
+    const pendingSteps = localSteps.filter(step => 
+      step.customSyncStatus === 'pending' || step.customSyncStatus === 'error'
+    );
+
+    if (pendingSteps.length > 0) {
+      console.log('📍 shouldSynchronizeSteps - Éléments en attente → Sync nécessaire');
+      return true;
+    }
+
+    console.log('📍 shouldSynchronizeSteps - Données à jour → Pas de sync');
+    return false;
+
+  } catch (err) {
+    console.warn('📍 shouldSynchronizeSteps - Erreur, sync par sécurité:', err);
+    return true; // En cas d'erreur, synchroniser par sécurité
+  }
 };
 
 /**
@@ -75,7 +124,7 @@ const convertCreateRequestToStep = (stepData: CreateStepRequest, tempId: string)
     roadtripId: stepData.roadtripId,
     title: stepData.name,
     description: stepData.notes,
-    type: stepData.type === 'Stage' ? 'overnight' : 'stop',
+    type: stepData.type, // Pas de conversion, types alignés
     orderIndex: 999, // sera réorganisé
     location: {
       latitude: stepData.latitude,
@@ -124,19 +173,32 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
    */
   const loadLocalSteps = useCallback(async () => {
     try {
-      console.log('📍 Chargement steps locaux pour roadtripId:', roadtripId);
+      console.log('�️ CACHE - Chargement steps locaux pour roadtripId:', roadtripId);
       
       const stepsCollection = database.get<StepModel>('steps');
       const localSteps = await stepsCollection
         .query(Q.where('roadtrip_id', roadtripId))
         .fetch();
 
-      console.log('📍 Steps trouvés en local:', localSteps.length);
+      console.log('�️ CACHE - Steps trouvés en local:', localSteps.length);
 
       const stepsData = localSteps
         .map((step, index) => {
           try {
             const stepInterface = step.toInterface();
+            
+            // Attacher les données API additionnelles depuis WatermelonDB
+            (stepInterface as any).travelTimePreviousStep = step.travelTimePreviousStep;
+            (stepInterface as any).distancePreviousStep = step.distancePreviousStep;
+            (stepInterface as any).travelTimeNote = step.travelTimeNote || 'OK';
+            
+            console.log('🗄️ CACHE - Step récupéré du cache:', {
+              title: stepInterface.title,
+              thumbnail: stepInterface.thumbnail ? 'présente' : 'absente',
+              thumbnailValue: stepInterface.thumbnail,
+              travelTimeNote: (stepInterface as any).travelTimeNote,
+              activitiesCount: (stepInterface as any).activities?.length || 0
+            });
             return stepInterface;
           } catch (err) {
             console.error(`❌ Erreur conversion step ${index + 1}:`, err instanceof Error ? err.message : err);
@@ -154,7 +216,8 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
           return a.orderIndex - b.orderIndex;
         });
 
-      console.log('📍 Steps finaux après conversion:', stepsData.length);
+      console.log('�️ CACHE - Steps finaux après conversion:', stepsData.length);
+      console.log('🗄️ CACHE - ✅ DONNÉES LOCALES UTILISÉES (cache-first)');
       setSteps(stepsData);
     } catch (err) {
       console.error('❌ Erreur chargement étapes locales:', err instanceof Error ? err.message : err);
@@ -164,19 +227,30 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
 
   /**
    * Synchronise avec l'API et met à jour la base locale
+   * Version optimisée : ne force la synchronisation que si nécessaire
    */
-  const refreshSteps = useCallback(async () => {
+  const refreshSteps = useCallback(async (forceSync: boolean = false) => {
+    // Si pas de synchronisation forcée, vérifier si c'est nécessaire
+    if (!forceSync) {
+      const shouldSync = await shouldSynchronizeSteps(roadtripId);
+      if (!shouldSync) {
+        console.log('📍 refreshSteps - Données à jour, pas de sync nécessaire');
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      console.log('refreshSteps - Début synchronisation pour roadtripId:', roadtripId);
+      console.log('🌐 API - Début synchronisation pour roadtripId:', roadtripId);
       
       // Récupération depuis l'API
       const apiSteps = await getStepsByRoadtrip(roadtripId);
       
-      console.log('refreshSteps - Étapes récupérées:', apiSteps.length);
-      console.log('refreshSteps - Première étape (exemple):', apiSteps[0]);
+      console.log('🌐 API - Étapes récupérées:', apiSteps.length);
+      console.log('🌐 API - ✅ DONNÉES API UTILISÉES (synchronisation)');
+      console.log('🌐 API - Première étape (exemple):', apiSteps[0]);
       
       // Conversion directe des données API en Steps avec toutes les données
       const convertedSteps = apiSteps
@@ -191,10 +265,10 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
           return a.orderIndex - b.orderIndex;
         });
 
-      console.log('refreshSteps - Steps convertis:', convertedSteps.length);
+      console.log('🌐 API - Steps convertis:', convertedSteps.length);
       setSteps(convertedSteps);
 
-      // Mise à jour de la base locale en arrière-plan (optionnel)
+      // Mise à jour de la base locale en arrière-plan (réactivé avec fix closure)
       try {
         await database.write(async () => {
           const stepsCollection = database.get<StepModel>('steps');
@@ -208,34 +282,95 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
             await step.markAsDeleted();
           }
 
-          // Ajoute les nouvelles étapes (version simplifiée)
+          // Timestamp de synchronisation pour marquer les données comme fraîches
+          const syncTimestamp = Date.now();
+
+          // Ajoute les nouvelles étapes avec fix closure
           for (const apiStep of apiSteps) {
-            if (!apiStep._id || !apiStep.type) continue;
+            if (!apiStep || !apiStep._id || !apiStep.type) {
+              console.warn('Step ignoré - données incomplètes:', apiStep?._id || 'ID manquant');
+              continue;
+            }
             
             try {
+              // Log pour vérifier le type de l'API
+              console.log('🔧 WatermelonDB - Type API reçu:', apiStep.type, 'pour step:', apiStep.name);
+              console.log('🔧 WatermelonDB - Thumbnail API:', apiStep.thumbnail ? 'présente' : 'absente', apiStep.thumbnail);
+              
+              // Sérialisation correcte de la thumbnail (objet → string)
+              let thumbnailString = '';
+              if (apiStep.thumbnail) {
+                if (typeof apiStep.thumbnail === 'string') {
+                  thumbnailString = apiStep.thumbnail;
+                } else if (typeof apiStep.thumbnail === 'object' && (apiStep.thumbnail as any).url) {
+                  thumbnailString = JSON.stringify(apiStep.thumbnail);
+                } else {
+                  thumbnailString = JSON.stringify(apiStep.thumbnail);
+                }
+              }
+              
+              // Préparation complète des données AVANT la closure (version minimale)
+              const rawData = {
+                user_id: apiStep.userId || 'unknown',
+                roadtrip_id: apiStep.roadtripId || roadtripId,
+                type: apiStep.type, // Utilise le type de l'API (Stage ou Stop)
+                name: apiStep.name || '',
+                address: apiStep.address || '',
+                latitude: apiStep.latitude || 0,
+                longitude: apiStep.longitude || 0,
+                arrival_date_time: apiStep.arrivalDateTime ? new Date(apiStep.arrivalDateTime).getTime() : Date.now(),
+                departure_date_time: apiStep.departureDateTime ? new Date(apiStep.departureDateTime).getTime() : Date.now(),
+                travel_time_previous_step: apiStep.travelTimePreviousStep || 0,
+                distance_previous_step: apiStep.distancePreviousStep || 0,
+                is_arrival_time_consistent: true,
+                travel_time_note: apiStep.travelTimeNote || 'OK', // Utilise la valeur de l'API
+                notes: apiStep.notes || '',
+                thumbnail: thumbnailString, // Thumbnail sérialisée
+                story: '',
+                activities: JSON.stringify(apiStep.activities || []), // Sérialise les activités
+                accommodations: JSON.stringify(apiStep.accommodations || []), // Sérialise les accommodations
+                // Champs BaseModel gérés manuellement
+                sync_status: 'synced',
+                last_sync_at: syncTimestamp,
+                created_at: syncTimestamp,
+                updated_at: syncTimestamp,
+                // Note: sync_status et last_sync_at gérés par BaseModel
+              };
+
+              // Création simple comme pour les roadtrips
               await stepsCollection.create((step: StepModel) => {
-                step._setRaw('user_id', apiStep.userId);
-                step._setRaw('roadtrip_id', apiStep.roadtripId);
-                step._setRaw('type', apiStep.type === 'Stage' ? 'overnight' : 'stop');
-                step._setRaw('name', apiStep.name || '');
-                step._setRaw('address', apiStep.address || '');
-                step._setRaw('latitude', apiStep.latitude || 0);
-                step._setRaw('longitude', apiStep.longitude || 0);
-                step._setRaw('arrival_date_time', new Date(apiStep.arrivalDateTime).getTime());
-                step._setRaw('departure_date_time', new Date(apiStep.departureDateTime).getTime());
-                step._setRaw('travel_time_previous_step', apiStep.travelTimePreviousStep || 0);
-                step._setRaw('distance_previous_step', apiStep.distancePreviousStep || 0);
-                step._setRaw('is_arrival_time_consistent', true);
-                step._setRaw('travel_time_note', 'OK');
-                step._setRaw('notes', apiStep.notes || '');
-                step._setRaw('thumbnail', apiStep.thumbnail || '');
-                step._setRaw('story', '');
+                step._setRaw('user_id', rawData.user_id);
+                step._setRaw('roadtrip_id', rawData.roadtrip_id);
+                step._setRaw('type', rawData.type);
+                step._setRaw('name', rawData.name);
+                step._setRaw('address', rawData.address);
+                step._setRaw('latitude', rawData.latitude);
+                step._setRaw('longitude', rawData.longitude);
+                step._setRaw('arrival_date_time', rawData.arrival_date_time);
+                step._setRaw('departure_date_time', rawData.departure_date_time);
+                step._setRaw('travel_time_previous_step', rawData.travel_time_previous_step);
+                step._setRaw('distance_previous_step', rawData.distance_previous_step);
+                step._setRaw('is_arrival_time_consistent', rawData.is_arrival_time_consistent);
+                step._setRaw('travel_time_note', rawData.travel_time_note);
+                step._setRaw('notes', rawData.notes);
+                step._setRaw('thumbnail', rawData.thumbnail);
+                step._setRaw('story', rawData.story);
+                step._setRaw('activities', rawData.activities);
+                step._setRaw('accommodations', rawData.accommodations);
+                step._setRaw('sync_status', rawData.sync_status);
+                step._setRaw('last_sync_at', rawData.last_sync_at);
+                step._setRaw('created_at', rawData.created_at);
+                step._setRaw('updated_at', rawData.updated_at);
               });
+              
+              console.log('✅ Step sauvegardé en local:', rawData.name);
             } catch (stepErr) {
               console.warn('Erreur création step en base locale:', stepErr);
               // Continue même si la sauvegarde locale échoue
             }
           }
+          
+          console.log('✅ Synchronisation locale terminée avec timestamp:', new Date(syncTimestamp).toISOString());
         });
       } catch (dbErr) {
         console.warn('Erreur sauvegarde locale (non critique):', dbErr);
@@ -400,14 +535,25 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
     }
   }, [steps, roadtripId, loadLocalSteps]);
 
-  // Chargement initial + synchronisation
+  // Chargement initial avec stratégie offline-first
   useEffect(() => {
-    // Charge d'abord les données locales
-    loadLocalSteps();
+    const initializeSteps = async () => {
+      // Toujours charger d'abord les données locales (offline-first)
+      await loadLocalSteps();
+      
+      // Vérifier la fraîcheur des données et la connectivité
+      const shouldSync = await shouldSynchronizeSteps(roadtripId);
+      
+      if (shouldSync) {
+        console.log('📍 ⚡ DÉCISION: Données pas à jour ou connectivité OK - Synchronisation API');
+        refreshSteps(false); // Ne bloque pas l'UI, se fait en arrière-plan
+      } else {
+        console.log('📍 ✅ DÉCISION: Données locales à jour - Pas de synchronisation API');
+      }
+    };
     
-    // Puis synchronise avec l'API
-    refreshSteps();
-  }, [loadLocalSteps, refreshSteps]);
+    initializeSteps();
+  }, [roadtripId]); // Dépendance uniquement sur roadtripId
 
   return {
     steps,

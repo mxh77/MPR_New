@@ -64,7 +64,8 @@ const StepsListScreen: React.FC = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshSteps();
+      // Force la synchronisation lors d'un pull-to-refresh explicite
+      await refreshSteps(true);
     } finally {
       setRefreshing(false);
     }
@@ -133,14 +134,10 @@ const StepsListScreen: React.FC = () => {
   // Fonction pour déterminer le type d'activité principal d'une étape (basée sur l'app existante)
   const getStepMainActivityType = (step: Step): string => {
     // Si c'est un Stop (arrêt transport), c'est toujours du Transport  
-    if (step.type === 'stop') return 'Transport';
+    if (step.type === 'Stop') return 'Transport';
     
     // Pour les étapes avec des activités (données de l'API)
     const stepWithActivities = step as any; // Cast temporaire pour accéder aux activités de l'API
-    
-    // Debug: Afficher les activités reçues
-    console.log('🎯 getStepMainActivityType - Step:', step.title);
-    console.log('🎯 getStepMainActivityType - Activities:', stepWithActivities.activities);
     
     if (stepWithActivities.activities && stepWithActivities.activities.length > 0) {
       const activeActivity = stepWithActivities.activities.find((activity: any) => activity.active !== false);
@@ -173,7 +170,7 @@ const StepsListScreen: React.FC = () => {
         return 'accommodation';
       default:
         // Si c'est un Stop, c'est du transport
-        if (step.type === 'stop') {
+        if (step.type === 'Stop') {
           return 'transport';
         }
         // Par défaut, une Stage est une étape overnight
@@ -306,6 +303,7 @@ const StepsListScreen: React.FC = () => {
   // Fonction pour extraire l'URI de l'image (basée sur l'app existante)
   const getImageUri = (thumbnail: any): string | null => {
     console.log('🖼️ getImageUri - thumbnail reçu:', typeof thumbnail, thumbnail);
+    console.log('🖼️ getImageUri - thumbnail reçu:', typeof thumbnail);
     
     if (!thumbnail) {
       console.log('🖼️ getImageUri - thumbnail null/undefined');
@@ -320,13 +318,15 @@ const StepsListScreen: React.FC = () => {
     
     // Si c'est un objet avec une propriété url (structure API)
     if (typeof thumbnail === 'object' && thumbnail.url && typeof thumbnail.url === 'string') {
-      console.log('🖼️ getImageUri - object.url:', thumbnail.url);
+    //   console.log('🖼️ getImageUri - object.url:', thumbnail.url);
+      console.log('🖼️ getImageUri - object.url:');
       return thumbnail.url;
     }
     
     // Si c'est un objet avec une propriété uri
     if (typeof thumbnail === 'object' && thumbnail.uri && typeof thumbnail.uri === 'string') {
-      console.log('🖼️ getImageUri - object.uri:', thumbnail.uri);
+    //   console.log('🖼️ getImageUri - object.uri:', thumbnail.uri);
+      console.log('🖼️ getImageUri - object.uri:');
       return thumbnail.uri;
     }
     
@@ -457,29 +457,6 @@ const StepsListScreen: React.FC = () => {
       return null;
     }
 
-    // Debug: Log de toutes les propriétés de l'item pour identifier le problème
-    console.log('🎯 renderStepItem - Debug complet de l\'item:', {
-      _id: item._id,
-      title: item.title,
-      type: item.type,
-      typeOfTitle: typeof item.title,
-      typeOfType: typeof item.type,
-      location: item.location,
-      startDate: item.startDate,
-      endDate: item.endDate,
-      distance: item.distance,
-      description: item.description,
-      syncStatus: item.syncStatus
-    });
-
-    // Vérifications supplémentaires pour les chaînes qui vont dans <Text>
-    console.log('🎯 Vérification des strings pour <Text>:');
-    console.log('- item.title:', typeof item.title, '=', item.title);
-    console.log('- item.type:', typeof item.type, '=', item.type);
-    console.log('- item.location?.address:', typeof item.location?.address, '=', item.location?.address);
-    console.log('- item.description:', typeof item.description, '=', item.description);
-    console.log('- item.syncStatus:', typeof item.syncStatus, '=', item.syncStatus);
-    
     return (
     <>
       <TouchableOpacity
@@ -541,7 +518,8 @@ const StepsListScreen: React.FC = () => {
           {/* Image de l'étape */}
           {(() => {
             const imageUri = getImageUri(item.thumbnail);
-            console.log('🖼️ renderStepItem - URI calculée pour', item.title, ':', imageUri);
+            // console.log('🖼️ renderStepItem - URI calculée pour', item.title, ':', imageUri);
+            console.log('🖼️ renderStepItem - URI calculée pour', item.title);
             
             // Vérification de sécurité supplémentaire pour s'assurer que l'URI est bien une chaîne
             if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
@@ -555,7 +533,7 @@ const StepsListScreen: React.FC = () => {
                     backgroundColor: '#F5F5F5' 
                   }}
                   resizeMode="cover"
-                  onLoad={() => console.log('🖼️ Image chargée avec succès:', imageUri)}
+                  onLoad={() => console.log('🖼️ Image chargée avec succès:')}
                   onError={(error) => {
                     console.warn('🖼️ Erreur de chargement d\'image:', error.nativeEvent.error, 'pour URI:', imageUri);
                   }}

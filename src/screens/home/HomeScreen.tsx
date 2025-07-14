@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useTheme } from '../../contexts';
 import { useNetworkStatus } from '../../hooks';
 import { Button, Card } from '../../components/common';
+import { resetDatabase } from '../../services/database/devUtils';
 
 export const HomeScreen: React.FC = () => {
   const { user } = useAuth();
@@ -39,6 +40,16 @@ export const HomeScreen: React.FC = () => {
   const handleExploreMap = () => {
     // TODO: Navigation vers carte
     console.log('Explorer la carte');
+  };
+
+  const handleResetDatabase = async () => {
+    try {
+      await resetDatabase();
+      alert('✅ Base de données réinitialisée avec succès !');
+    } catch (error) {
+      console.error('Erreur reset DB:', error);
+      alert('❌ Erreur lors de la réinitialisation');
+    }
   };
 
   const styles = StyleSheet.create({
@@ -134,6 +145,14 @@ export const HomeScreen: React.FC = () => {
     statLabel: {
       fontSize: 12,
       color: theme.colors.textSecondary,
+    },
+    debugButton: {
+      backgroundColor: theme.colors.danger,
+      borderRadius: 8,
+    },
+    debugButtonText: {
+      color: theme.colors.white,
+      fontWeight: 'bold',
     },
   });
 
@@ -261,6 +280,19 @@ export const HomeScreen: React.FC = () => {
               </View>
             </Card>
           </View>
+
+          {/* BOUTON DEBUG - À SUPPRIMER EN PRODUCTION */}
+          {__DEV__ && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🔧 Debug</Text>
+              <Button
+                title="🗑️ Reset Base de Données"
+                onPress={handleResetDatabase}
+                style={styles.debugButton}
+                textStyle={styles.debugButtonText}
+              />
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

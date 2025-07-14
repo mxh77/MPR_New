@@ -42,8 +42,8 @@ export const ALGOLIA_CONFIG = {
 
 // Configuration WatermelonDB
 export const DATABASE_CONFIG = {
-  name: 'monpetitroadtrip.db',
-  version: 1,
+  name: 'monpetitroadtrip_v3.db', // Nouveau nom pour forcer reset avec nouvelles colonnes
+  version: 6, // Version alignée avec le schéma
   synchronize: true,
 } as const;
 

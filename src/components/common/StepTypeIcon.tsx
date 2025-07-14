@@ -18,12 +18,10 @@ const StepTypeIcon: React.FC<StepTypeIconProps> = ({
 }) => {
   const getIconName = (stepType: StepType): keyof typeof Ionicons.glyphMap => {
     switch (stepType) {
-      case 'stop':
+      case 'Stop':
         return 'pause-circle-outline';
-      case 'overnight':
+      case 'Stage':
         return 'bed-outline';
-      case 'activity':
-        return 'play-circle-outline';
       default:
         return 'location-outline';
     }

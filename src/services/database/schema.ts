@@ -4,7 +4,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 4, // Incrémentation pour nettoyage complet de la base
+  version: 6, // Nouvelle version pour les activités et accommodations
   tables: [
     // Table des roadtrips
     tableSchema({
@@ -54,6 +54,10 @@ export const schema = appSchema({
         { name: 'notes', type: 'string', isOptional: true },
         { name: 'thumbnail', type: 'string', isOptional: true },
         { name: 'story', type: 'string', isOptional: true },
+        { name: 'activities', type: 'string', isOptional: true }, // JSON array des activités
+        { name: 'accommodations', type: 'string', isOptional: true }, // JSON array des hébergements
+        { name: 'sync_status', type: 'string' },
+        { name: 'last_sync_at', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

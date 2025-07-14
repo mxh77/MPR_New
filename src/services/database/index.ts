@@ -47,4 +47,20 @@ export const database = new Database({
   ],
 });
 
+// 🚨 RESET TEMPORAIRE POUR DÉVELOPPEMENT
+// Réinitialise la base de données au démarrage pour résoudre les conflits de version
+if (__DEV__) {
+  (async () => {
+    try {
+      console.log('🔄 Réinitialisation de la base de données en développement...');
+      await database.write(async () => {
+        await database.unsafeResetDatabase();
+      });
+      console.log('✅ Base de données réinitialisée avec succès');
+    } catch (error) {
+      console.error('❌ Erreur lors de la réinitialisation:', error);
+    }
+  })();
+}
+
 export default database;

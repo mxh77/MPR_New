@@ -34,12 +34,10 @@ const StepCard: React.FC<StepCardProps> = ({
 
   const getStepTypeColor = (type: StepType): string => {
     switch (type) {
-      case 'stop':
+      case 'Stop':
         return theme.colors.warning;
-      case 'overnight':
+      case 'Stage':
         return theme.colors.primary;
-      case 'activity':
-        return theme.colors.success;
       default:
         return theme.colors.textSecondary;
     }
@@ -47,12 +45,10 @@ const StepCard: React.FC<StepCardProps> = ({
 
   const getStepTypeLabel = (type: StepType): string => {
     switch (type) {
-      case 'stop':
+      case 'Stop':
         return 'Arrêt';
-      case 'overnight':
+      case 'Stage':
         return 'Étape';
-      case 'activity':
-        return 'Activité';
       default:
         return 'Inconnu';
     }

@@ -6,7 +6,7 @@
 export type ActivityType = 'hiking' | 'visit' | 'restaurant' | 'accommodation' | 'transport' | 'other';
 
 // Types d'étapes  
-export type StepType = 'stop' | 'overnight' | 'activity';
+export type StepType = 'Stage' | 'Stop';
 
 // Priorités des tâches
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';

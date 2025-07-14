@@ -17,7 +17,7 @@ export default class Step extends BaseModel {
 
   @field('user_id') userId!: string;
   @field('roadtrip_id') roadtripId!: string;
-  @field('type') type?: string;
+  @field('type') type!: StepType;
   @field('name') name?: string;
   @field('address') address?: string;
   @field('latitude') latitude?: number;
@@ -31,6 +31,8 @@ export default class Step extends BaseModel {
   @field('notes') notes?: string;
   @field('thumbnail') thumbnail?: string;
   @field('story') story?: string;
+  @field('activities') activitiesJson?: string; // JSON string des activités
+  @field('accommodations') accommodationsJson?: string; // JSON string des hébergements
 
   @relation('roadtrips', 'roadtrip_id') roadtrip: any;
   @children('activities') activities: any;
@@ -58,10 +60,41 @@ export default class Step extends BaseModel {
         throw new Error(`Step ${this.id} has no type`);
       }
       
-      // Conversion du type backend vers type frontend
-      const convertedType: StepType = this.type === 'Stage' ? 'overnight' : (this.type === 'Stop' ? 'stop' : 'activity');
+      // Conversion du type backend vers type frontend - maintenant aligné  
+      const convertedType: StepType = this.type; // Pas de conversion, on garde les types API
       
-      return {
+      // Désérialisation des activités et accommodations depuis JSON
+      let activities = [];
+      let accommodations = [];
+      let thumbnailProcessed = this.thumbnail;
+      
+      if (this.activitiesJson) {
+        try {
+          activities = JSON.parse(this.activitiesJson);
+        } catch (e) {
+          console.warn('Erreur désérialisation activités:', e);
+        }
+      }
+      
+      if (this.accommodationsJson) {
+        try {
+          accommodations = JSON.parse(this.accommodationsJson);
+        } catch (e) {
+          console.warn('Erreur désérialisation accommodations:', e);
+        }
+      }
+      
+      // Désérialisation de la thumbnail si c'est un JSON
+      if (this.thumbnail && this.thumbnail.startsWith('{')) {
+        try {
+          thumbnailProcessed = JSON.parse(this.thumbnail);
+        } catch (e) {
+          // Si la désérialisation échoue, garder la string
+          thumbnailProcessed = this.thumbnail;
+        }
+      }
+      
+      const stepInterface = {
         _id: this.id,
         roadtripId: this.roadtripId,
         title: this.name || '',
@@ -73,12 +106,18 @@ export default class Step extends BaseModel {
         endDate: this.departureDateTime ? new Date(this.departureDateTime) : undefined,
         duration: this.travelTimePreviousStep,
         distance: this.distancePreviousStep,
-        thumbnail: this.thumbnail,
+        thumbnail: thumbnailProcessed, // Thumbnail désérialisée
         syncStatus: 'synced' as any, // Pas de sync status dans le backend
         lastSyncAt: this.updatedAt,
         createdAt: this.createdAt,
         updatedAt: this.updatedAt,
-      };
+      } as IStep;
+      
+      // Attacher les activités et accommodations comme dans l'API
+      (stepInterface as any).activities = activities;
+      (stepInterface as any).accommodations = accommodations;
+      
+      return stepInterface;
     } catch (err) {
       console.error('Erreur Step.toInterface() pour step:', this.id, err instanceof Error ? err.message : err);
       throw err;
