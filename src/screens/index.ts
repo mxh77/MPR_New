@@ -17,5 +17,8 @@ export { HomeScreen } from './home/HomeScreen';
 // Écrans Roadtrips
 export { RoadtripsListScreen } from './roadtrips/RoadtripsListScreen';
 
+// Écrans Steps
+export { default as StepsListScreen } from './steps/StepsListScreen';
+
 // Écrans Profil
 export { ProfileScreen } from './profile/ProfileScreen';

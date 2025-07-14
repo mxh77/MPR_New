@@ -37,6 +37,10 @@ export const RoadtripDetailScreen: React.FC<RoadtripDetailScreenProps> = () => {
   const { roadtripId } = route.params;
   const { roadtrip, loading, error, reloadRoadtrip } = useRoadtripDetail(roadtripId);
 
+  // Debug: Log de l'ID du roadtrip dans RoadtripDetailScreen
+  console.log('RoadtripDetailScreen - roadtripId:', roadtripId);
+  console.log('RoadtripDetailScreen - roadtrip object:', roadtrip?.id, roadtrip?.title);
+
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('fr-FR', {
       weekday: 'long',
@@ -59,8 +63,23 @@ export const RoadtripDetailScreen: React.FC<RoadtripDetailScreenProps> = () => {
   };
 
   const handleViewSteps = () => {
-    // TODO: Navigation vers la liste des étapes
-    Alert.alert('Fonctionnalité', 'Liste des étapes - À implémenter');
+    console.log('handleViewSteps - roadtripId local:', roadtripId);
+    console.log('handleViewSteps - roadtrip objet:', roadtrip);
+    console.log('handleViewSteps - serverId:', roadtrip?.serverId);
+    
+    // Utilise le serverId du roadtrip car c'est ce que le backend attend
+    const serverRoadtripId = roadtrip?.serverId;
+    
+    if (!serverRoadtripId) {
+      Alert.alert(
+        'Erreur',
+        'Impossible de charger les étapes. Le roadtrip n\'est pas encore synchronisé avec le serveur.'
+      );
+      return;
+    }
+    
+    console.log('handleViewSteps - serverId utilisé:', serverRoadtripId);
+    navigation.navigate('StepList', { roadtripId: serverRoadtripId });
   };
 
   const handleShareRoadtrip = () => {

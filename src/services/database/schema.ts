@@ -4,7 +4,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 2, // Incrémentation de version pour migration
+  version: 4, // Incrémentation pour nettoyage complet de la base
   tables: [
     // Table des roadtrips
     tableSchema({
@@ -38,20 +38,22 @@ export const schema = appSchema({
     tableSchema({
       name: 'steps',
       columns: [
+        { name: 'user_id', type: 'string', isIndexed: true },
         { name: 'roadtrip_id', type: 'string', isIndexed: true },
-        { name: 'title', type: 'string' },
-        { name: 'description', type: 'string', isOptional: true },
-        { name: 'type', type: 'string' },
-        { name: 'order_index', type: 'number' },
-        { name: 'location', type: 'string' }, // JSON object
-        { name: 'start_date', type: 'number', isOptional: true },
-        { name: 'end_date', type: 'number', isOptional: true },
-        { name: 'duration', type: 'number', isOptional: true },
-        { name: 'distance', type: 'number', isOptional: true },
+        { name: 'type', type: 'string', isOptional: true },
+        { name: 'name', type: 'string', isOptional: true },
+        { name: 'address', type: 'string', isOptional: true },
+        { name: 'latitude', type: 'number', isOptional: true },
+        { name: 'longitude', type: 'number', isOptional: true },
+        { name: 'arrival_date_time', type: 'number', isOptional: true },
+        { name: 'departure_date_time', type: 'number', isOptional: true },
+        { name: 'travel_time_previous_step', type: 'number', isOptional: true },
+        { name: 'distance_previous_step', type: 'number', isOptional: true },
+        { name: 'is_arrival_time_consistent', type: 'boolean', isOptional: true },
+        { name: 'travel_time_note', type: 'string', isOptional: true },
+        { name: 'notes', type: 'string', isOptional: true },
         { name: 'thumbnail', type: 'string', isOptional: true },
-        { name: 'transport_info', type: 'string', isOptional: true }, // JSON object
-        { name: 'sync_status', type: 'string' },
-        { name: 'last_sync_at', type: 'number', isOptional: true },
+        { name: 'story', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

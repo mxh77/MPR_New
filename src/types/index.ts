@@ -78,7 +78,6 @@ export interface Step extends BaseEntity {
   duration?: number;
   distance?: number;
   thumbnail?: string;
-  transportInfo?: TransportInfo;
 }
 
 // Localisation

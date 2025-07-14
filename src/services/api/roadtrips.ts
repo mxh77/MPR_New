@@ -79,9 +79,60 @@ export interface ApiStep {
   photos: string[];
   documents: string[];
   thumbnail?: string;
-  accommodations: string[];
-  activities: string[];
+  accommodations: ApiAccommodation[]; // Objets complets, pas des IDs
+  activities: ApiActivity[]; // Objets complets, pas des IDs
   story?: string;
+}
+
+export interface ApiActivity {
+  _id: string;
+  userId: string;
+  stepId: string;
+  active: boolean;
+  type: string;
+  name: string;
+  address: string;
+  latitude?: number;
+  longitude?: number;
+  website?: string;
+  phone?: string;
+  email?: string;
+  startDateTime?: string;
+  endDateTime?: string;
+  duration?: number;
+  typeDuration?: string;
+  reservationNumber?: string;
+  price?: number;
+  currency?: string;
+  notes?: string;
+  photos: string[];
+  documents: string[];
+  thumbnail?: string;
+  algoliaId?: string;
+}
+
+export interface ApiAccommodation {
+  _id: string;
+  userId: string;
+  stepId: string;
+  active: boolean;
+  type: string;
+  name: string;
+  address: string;
+  latitude?: number;
+  longitude?: number;
+  website?: string;
+  phone?: string;
+  email?: string;
+  arrivalDateTime?: string;
+  departureDateTime?: string;
+  reservationNumber?: string;
+  price?: number;
+  currency?: string;
+  notes?: string;
+  photos: string[];
+  documents: string[];
+  thumbnail?: string;
 }
 
 export interface CreateRoadtripRequest {

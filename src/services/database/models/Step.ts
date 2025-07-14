@@ -3,7 +3,7 @@
  */
 import { field, children, relation } from '@nozbe/watermelondb/decorators';
 import BaseModel from './BaseModel';
-import type { Step as IStep, Location, TransportInfo } from '../../../types';
+import type { Step as IStep, Location, TransportInfo, StepType } from '../../../types';
 
 export default class Step extends BaseModel {
   static table = 'steps';
@@ -15,18 +15,22 @@ export default class Step extends BaseModel {
     stories: { type: 'has_many' as const, foreignKey: 'step_id' },
   };
 
+  @field('user_id') userId!: string;
   @field('roadtrip_id') roadtripId!: string;
-  @field('title') title!: string;
-  @field('description') description?: string;
-  @field('type') type!: string;
-  @field('order_index') orderIndex!: number;
-  @field('location') locationJson!: string;
-  @field('start_date') startDate?: number;
-  @field('end_date') endDate?: number;
-  @field('duration') duration?: number;
-  @field('distance') distance?: number;
+  @field('type') type?: string;
+  @field('name') name?: string;
+  @field('address') address?: string;
+  @field('latitude') latitude?: number;
+  @field('longitude') longitude?: number;
+  @field('arrival_date_time') arrivalDateTime?: number;
+  @field('departure_date_time') departureDateTime?: number;
+  @field('travel_time_previous_step') travelTimePreviousStep?: number;
+  @field('distance_previous_step') distancePreviousStep?: number;
+  @field('is_arrival_time_consistent') isArrivalTimeConsistent?: boolean;
+  @field('travel_time_note') travelTimeNote?: string;
+  @field('notes') notes?: string;
   @field('thumbnail') thumbnail?: string;
-  @field('transport_info') transportInfoJson?: string;
+  @field('story') story?: string;
 
   @relation('roadtrips', 'roadtrip_id') roadtrip: any;
   @children('activities') activities: any;
@@ -35,48 +39,49 @@ export default class Step extends BaseModel {
   @children('stories') stories: any;
 
   get location(): Location {
-    try {
-      return JSON.parse(this.locationJson);
-    } catch {
-      return { latitude: 0, longitude: 0 };
-    }
+    return { 
+      latitude: this.latitude || 0, 
+      longitude: this.longitude || 0,
+      address: this.address 
+    };
   }
 
   set location(value: Location) {
-    this.locationJson = JSON.stringify(value);
-  }
-
-  get transportInfo(): TransportInfo | undefined {
-    try {
-      return this.transportInfoJson ? JSON.parse(this.transportInfoJson) : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  set transportInfo(value: TransportInfo | undefined) {
-    this.transportInfoJson = value ? JSON.stringify(value) : undefined;
+    // Les propriétés latitude/longitude/address sont gérées séparément
+    // Cette méthode est conservée pour compatibilité avec l'interface
   }
 
   toInterface(): IStep {
-    return {
-      _id: this.id,
-      roadtripId: this.roadtripId,
-      title: this.title,
-      description: this.description,
-      type: this.type as any,
-      orderIndex: this.orderIndex,
-      location: this.location,
-      startDate: this.startDate ? new Date(this.startDate) : undefined,
-      endDate: this.endDate ? new Date(this.endDate) : undefined,
-      duration: this.duration,
-      distance: this.distance,
-      thumbnail: this.thumbnail,
-      transportInfo: this.transportInfo,
-      syncStatus: this.customSyncStatus as any,
-      lastSyncAt: this.lastSyncAt,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt,
-    };
+    try {
+      // Vérification des propriétés critiques
+      if (!this.type) {
+        throw new Error(`Step ${this.id} has no type`);
+      }
+      
+      // Conversion du type backend vers type frontend
+      const convertedType: StepType = this.type === 'Stage' ? 'overnight' : (this.type === 'Stop' ? 'stop' : 'activity');
+      
+      return {
+        _id: this.id,
+        roadtripId: this.roadtripId,
+        title: this.name || '',
+        description: this.notes || '',
+        type: convertedType,
+        orderIndex: 0, // Pas d'ordre dans le backend
+        location: this.location,
+        startDate: this.arrivalDateTime ? new Date(this.arrivalDateTime) : undefined,
+        endDate: this.departureDateTime ? new Date(this.departureDateTime) : undefined,
+        duration: this.travelTimePreviousStep,
+        distance: this.distancePreviousStep,
+        thumbnail: this.thumbnail,
+        syncStatus: 'synced' as any, // Pas de sync status dans le backend
+        lastSyncAt: this.updatedAt,
+        createdAt: this.createdAt,
+        updatedAt: this.updatedAt,
+      };
+    } catch (err) {
+      console.error('Erreur Step.toInterface() pour step:', this.id, err instanceof Error ? err.message : err);
+      throw err;
+    }
   }
 }
