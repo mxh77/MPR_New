@@ -52,6 +52,25 @@ src/
 
 ## Règles de Développement Strictes
 
+### Analyse Proactive des Erreurs
+- **TOUJOURS analyser les logs d'erreur EN PRIORITÉ** avant de proposer des solutions
+- Si un log API est fourni, examiner IMMÉDIATEMENT la structure des données retournées
+- Identifier les incompatibilités de types entre API et composants AVANT de coder
+- Pour les erreurs React Native Image/URI : vérifier que la source est une string, pas un objet
+- Pour les erreurs TypeScript : lire le message d'erreur complet et corriger à la racine
+
+### Structures de Données API Critiques
+- **Thumbnails** : Toujours des objets `{ _id, url, type, fileId }` - JAMAIS des strings
+- **Dates** : ISO strings nécessitant `new Date()` pour Date objects
+- **Géolocalisation** : Structure `{ latitude, longitude, address }` 
+- **Sync Status** : `pending|synced|error` avec `lastSyncAt` timestamp
+
+### Debugging Obligatoire
+- TOUJOURS ajouter `console.log` pour structures de données inconnues
+- Vérifier les types avec `typeof` avant utilisation dans composants
+- Utiliser des fonctions utilitaires pour extraire/valider les données (ex: `getImageUri()`
+- Ne JAMAIS assumer qu'une propriété API correspond au type interface local
+
 ### API Backend
 - **JAMAIS de préfixe `/api/`** - routes directes `/roadtrips`, `/steps/:id/activities`
 - Bearer token automatique via intercepteurs Axios

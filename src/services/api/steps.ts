@@ -63,16 +63,13 @@ export const getStepsByRoadtrip = async (roadtripId: string): Promise<ApiStep[]>
  */
 export const getStepById = async (stepId: string): Promise<ApiStep> => {
   try {
-    const response: AxiosResponse<StepResponse> = await apiClient.get(`/steps/${stepId}`);
+    const response: AxiosResponse<ApiStep> = await apiClient.get(`/steps/${stepId}`);
     
-    if (response.data.success) {
-      return response.data.data;
-    } else {
-      throw new Error(response.data.message || 'Erreur lors de la récupération de l\'étape');
-    }
+    // L'API renvoie directement l'objet step, pas dans une structure wrapper
+    return response.data;
   } catch (error) {
     console.error('Erreur getStepById:', error);
-    throw error;
+    throw new Error('Erreur lors de la récupération de l\'étape');
   }
 };
 

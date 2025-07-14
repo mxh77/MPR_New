@@ -7,6 +7,7 @@ import { RoadtripsListScreenWithApi } from '../../screens/roadtrips/RoadtripsLis
 import { RoadtripDetailScreen } from '../../screens/roadtrips/RoadtripDetailScreen';
 import { CreateRoadtripScreen } from '../../screens/roadtrips/CreateRoadtripScreen';
 import { StepsListScreen } from '../../screens';
+import StepDetailScreen from '../../screens/steps/StepDetailScreen';
 
 // Types pour la navigation roadtrips
 export type RoadtripsStackParamList = {
@@ -16,6 +17,10 @@ export type RoadtripsStackParamList = {
   };
   CreateRoadtrip: undefined;
   StepList: {
+    roadtripId: string;
+  };
+  StepDetail: {
+    stepId: string;
     roadtripId: string;
   };
 };
@@ -37,6 +42,7 @@ export const RoadtripsNavigator: React.FC = () => {
       <RoadtripsStack.Screen name="RoadtripDetail" component={RoadtripDetailScreen} />
       <RoadtripsStack.Screen name="CreateRoadtrip" component={CreateRoadtripScreen} />
       <RoadtripsStack.Screen name="StepList" component={StepsListScreen} />
+      <RoadtripsStack.Screen name="StepDetail" component={StepDetailScreen} />
     </RoadtripsStack.Navigator>
   );
 };

@@ -96,7 +96,7 @@ const StepsListScreen: React.FC = () => {
   };
 
   const handleStepPress = (step: Step) => {
-    Alert.alert('À implémenter', `Voir les détails de "${step.title}" - fonctionnalité à venir`);
+    navigation.navigate('StepDetail', { stepId: step._id, roadtripId });
   };
 
   const handleEditStep = (step: Step) => {
@@ -318,16 +318,16 @@ const StepsListScreen: React.FC = () => {
       return thumbnail;
     }
     
-    // Si c'est un objet avec une propriété uri
-    if (typeof thumbnail === 'object' && thumbnail.uri) {
-      console.log('🖼️ getImageUri - object.uri:', thumbnail.uri);
-      return thumbnail.uri;
-    }
-    
-    // Si c'est un objet avec une propriété url
-    if (typeof thumbnail === 'object' && thumbnail.url) {
+    // Si c'est un objet avec une propriété url (structure API)
+    if (typeof thumbnail === 'object' && thumbnail.url && typeof thumbnail.url === 'string') {
       console.log('🖼️ getImageUri - object.url:', thumbnail.url);
       return thumbnail.url;
+    }
+    
+    // Si c'est un objet avec une propriété uri
+    if (typeof thumbnail === 'object' && thumbnail.uri && typeof thumbnail.uri === 'string') {
+      console.log('🖼️ getImageUri - object.uri:', thumbnail.uri);
+      return thumbnail.uri;
     }
     
     console.log('🖼️ getImageUri - Aucun format reconnu pour:', thumbnail);
@@ -543,36 +543,41 @@ const StepsListScreen: React.FC = () => {
             const imageUri = getImageUri(item.thumbnail);
             console.log('🖼️ renderStepItem - URI calculée pour', item.title, ':', imageUri);
             
-            return imageUri ? (
-              <Image
-                source={{ uri: imageUri }}
-                style={{ 
+            // Vérification de sécurité supplémentaire pour s'assurer que l'URI est bien une chaîne
+            if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
+              return (
+                <Image
+                  source={{ uri: imageUri }}
+                  style={{ 
+                    height: 120, 
+                    borderRadius: 8, 
+                    marginBottom: 12,
+                    backgroundColor: '#F5F5F5' 
+                  }}
+                  resizeMode="cover"
+                  onLoad={() => console.log('🖼️ Image chargée avec succès:', imageUri)}
+                  onError={(error) => {
+                    console.warn('🖼️ Erreur de chargement d\'image:', error.nativeEvent.error, 'pour URI:', imageUri);
+                  }}
+                />
+              );
+            } else {
+              return (
+                <View style={{ 
                   height: 120, 
+                  backgroundColor: '#F5F5F5', 
                   borderRadius: 8, 
-                  marginBottom: 12,
-                  backgroundColor: '#F5F5F5' 
-                }}
-                resizeMode="cover"
-                onLoad={() => console.log('🖼️ Image chargée avec succès:', imageUri)}
-                onError={(error) => {
-                  console.warn('🖼️ Erreur de chargement d\'image:', error.nativeEvent.error, 'pour URI:', imageUri);
-                }}
-              />
-            ) : (
-              <View style={{ 
-                height: 120, 
-                backgroundColor: '#F5F5F5', 
-                borderRadius: 8, 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                marginBottom: 12 
-              }}>
-                <Ionicons name="image-outline" size={32} color={theme.colors.textSecondary} />
-                <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 8 }}>
-                  Pas d'image
-                </Text>
-              </View>
-            );
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  marginBottom: 12 
+                }}>
+                  <Ionicons name="image-outline" size={32} color={theme.colors.textSecondary} />
+                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 8 }}>
+                    Pas d'image
+                  </Text>
+                </View>
+              );
+            }
           })()}
 
           {/* Informations de dates comme dans l'existant */}
