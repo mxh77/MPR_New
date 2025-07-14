@@ -1,4 +1,4 @@
-package com.mxh7777.MPR_New
+package com.maxime.heron.monpetitroadtrip2
 
 import android.app.Application
 import android.content.res.Configuration

@@ -6,8 +6,8 @@
     "start": "expo start",
     "start:clear": "expo start --clear",
     "android": "expo run:android",
-    "android:debug": "expo run:android --variant debug",
-    "android:release": "expo run:android --variant release",
+    "android:debug": "cross-env BUILD_TYPE=debug npx expo prebuild && npx expo run:android",
+    "android:release": "cross-env BUILD_TYPE=release npx expo prebuild && cd android && gradlew.bat assembleRelease",
     "ios": "expo run:ios",
     "ios:debug": "expo run:ios --configuration Debug",
     "ios:release": "expo run:ios --configuration Release",
@@ -57,6 +57,7 @@
     "@typescript-eslint/eslint-plugin": "^8.36.0",
     "@typescript-eslint/parser": "^8.36.0",
     "babel-plugin-styled-components": "^2.1.4",
+    "cross-env": "^7.0.3",
     "eslint": "^9.31.0",
     "typescript": "~5.8.3"
   },

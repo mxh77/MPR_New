@@ -2,6 +2,16 @@
 
 # Instructions Copilot pour Mon Petit Roadtrip v2
 
+## 📋 Table des Matières
+1. [Contexte & Architecture](#contexte-du-projet)
+2. [Structure de Fichiers](#structure-de-fichiers-critique)
+3. [🚨 SCHÉMAS CRITIQUES](#️-schémas-de-données---règles-critiques-️)
+4. [Règles de Développement](#règles-de-développement-strictes)
+5. [📊 MONGODB RÉFÉRENCE](#-schémas-mongodb---référence-obligatoire)
+6. [Patterns Spécifiques](#patterns-darchitecture-spécifiques)
+
+---
+
 ## Contexte du Projet
 Application React Native de planification de road trips avec architecture offline-first, utilisant WatermelonDB pour la persistance locale et synchronisation avec backend.
 
@@ -144,4 +154,26 @@ console.log('🔍 Parsed data:', JSON.parse(jsonField));
 - **Validation après parse** : try/catch + fallback sur valeur par défaut
 - **Thumbnails** : Gérer les cas string ET object dans la désérialisation
 - **Arrays vides** : `|| []` systématique après JSON.parse
-````
+
+## 📊 SCHÉMAS MONGODB - RÉFÉRENCE OBLIGATOIRE
+
+### ⚠️ RÈGLE CRITIQUE : Consulter `.github/mongodb-reference.md` pour les détails complets
+
+### Types API Exacts (Source de vérité)
+- `StepType`: `"Stage" | "Stop"` (EXACTEMENT ces valeurs)
+- `ActivityType`: `"hiking" | "visit" | "restaurant" | "accommodation" | "transport" | "other"`
+- `TravelTimeNote`: `"ERROR" | "WARNING" | "OK"`
+
+### Mapping API → WatermelonDB CRITIQUE
+- `arrivalDateTime` (ISO string) → `arrival_date_time` (timestamp)
+- `activities` (Array<ObjectId>) → `activities` (JSON string)
+- `thumbnail` (File Object) → `thumbnail` (JSON string)
+
+### Règles de Validation
+- **Stage** = peut avoir accommodations + activities
+- **Stop** = JAMAIS d'accommodations/activities  
+- **Thumbnail** = toujours objet `{_id, url, type, fileId}`
+
+### � Documentation Complète
+- **Référence rapide** : `.github/mongodb-reference.md` (à attacher si besoin)
+- **Documentation complète** : `Refonte/DOCUMENTATION_MODELES.md`
