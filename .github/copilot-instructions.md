@@ -50,6 +50,49 @@ src/
 - Couleurs par activité: `hiking: '#FF5722'`, `accommodation: '#4CAF50'`
 - États sync: `online: '#4CAF50'`, `offline: '#FF5722'`, `syncing: '#FF9800'`
 
+## ⚠️ SCHÉMAS DE DONNÉES - RÈGLES CRITIQUES ⚠️
+
+### Cohérence WatermelonDB ↔ MongoDB
+- **TOUJOURS vérifier la correspondance exacte** entre schéma WatermelonDB et API MongoDB
+- **Types de données** : Respecter EXACTEMENT les types API (Stage/Stop vs type local)
+- **Noms de champs** : snake_case en WatermelonDB vs camelCase en API
+- **Structures complexes** : JSON.stringify/parse obligatoire pour objects/arrays
+- **Migrations** : JAMAIS modifier une migration existante, toujours créer v+1
+
+### Mapping API ↔ Local OBLIGATOIRE
+```typescript
+// API Response (MongoDB)     →  WatermelonDB Model
+arrivalDateTime              →  arrival_date_time (timestamp)
+departureDateTime           →  departure_date_time (timestamp)
+travelTimePreviousStep      →  travel_time_previous_step (number)
+distancePreviousStep        →  distance_previous_step (number)
+travelTimeNote              →  travel_time_note (string)
+activities: Array<Object>   →  activities (JSON string)
+accommodations: Array<Object> → accommodations (JSON string)
+thumbnail: Object           →  thumbnail (JSON string)
+```
+
+### Validation Schéma AVANT Développement
+1. **Examiner l'API response** avec console.log AVANT de coder
+2. **Vérifier le schéma WatermelonDB** dans `src/services/database/schema.ts`
+3. **Identifier les incompatibilités** de types/noms/structures
+4. **Créer la migration** AVANT de modifier les modèles
+5. **Tester la sérialisation/désérialisation** des données complexes
+
+### Règles de Sérialisation JSON
+- **Thumbnails** : `JSON.stringify(thumbnail)` → `JSON.parse(thumbnailString)`
+- **Arrays d'objets** : Toujours sérialiser en JSON string en WatermelonDB
+- **Validation** : Vérifier que `typeof parsed === 'object'` après parse
+- **Fallbacks** : Toujours avoir des valeurs par défaut (`|| []`, `|| {}`)
+
+### Debug Schéma Obligatoire
+```typescript
+// TOUJOURS logger les structures inconnues
+console.log('🔍 API Response structure:', response);
+console.log('🔍 WatermelonDB raw:', model._raw);
+console.log('🔍 Parsed data:', JSON.parse(jsonField));
+```
+
 ## Règles de Développement Strictes
 
 ### Analyse Proactive des Erreurs
@@ -71,33 +114,34 @@ src/
 - Utiliser des fonctions utilitaires pour extraire/valider les données (ex: `getImageUri()`
 - Ne JAMAIS assumer qu'une propriété API correspond au type interface local
 
-### API Backend
-- **JAMAIS de préfixe `/api/`** - routes directes `/roadtrips`, `/steps/:id/activities`
-- Bearer token automatique via intercepteurs Axios
-- Retry 3x avec backoff exponentiel sur échecs réseau
+### Gestion des Migrations WatermelonDB CRITIQUE
+- **JAMAIS modifier une migration existante** même en développement
+- **Toujours créer une nouvelle version** de migration (v+1)
+- **Changer le nom de DB en développement** pour éviter les conflits
+- **Réinitialiser complètement** : `devUtils.resetDatabase()` si nécessaire
+- **Tester la migration** AVANT de commiter
 
-### Offline-First WatermelonDB  
-- Toutes mutations DOIVENT être optimistes (réponse immédiate)
-- Queue de sync persistante avec `SyncQueue` model
-- Résolution conflits: "serveur gagne" toujours
-- BaseRepository pattern pour CRUD + sync uniform
+### Problèmes de Closure dans WatermelonDB
+- **Variables externes dans les closures** : Préparer TOUTES les données AVANT database.write()
+- **Éviter les références externes** dans les fonctions de création/modification
+- **Sérialiser les objets complexes** en variables locales avant la closure
+- **Utiliser _setRaw()** systématiquement pour éviter les validations automatiques
 
-### Performance Obligatoire
-- `React.memo()` sur TOUS composants de liste
-- `useCallback()` sur fonctions passées en props
-- `useMemo()` sur calculs coûteux (>50ms)
-- `FlatList` avec `getItemLayout()` quand possible
+### Gestion des Types API vs Interface
+- **Énums de l'API** peuvent différer des interfaces locales (Stage/Stop vs StepType)
+- **TOUJOURS mapper les types** : ne pas assumer qu'ils correspondent
+- **Valider les types reçus** : `if (!['hiking', 'visit'].includes(apiType))`
+- **Logger les types inconnus** pour debugging
 
-### Conventions TypeScript
-- Interfaces de props suffixées `Props`: `ButtonProps`, `CardProps`
-- Hooks custom préfixés `use`: `useAuth()`, `useOfflineStatus()`
-- Constants `UPPER_SNAKE_CASE`: `API_TIMEOUT`, `MAX_RETRY_ATTEMPTS`
-- Services avec interfaces: `IAuthService`, `IRoadtripRepository`
+### Cache vs API - Stratégie Offline-First
+- **Cache-first obligatoire** : charger local PUIS synchroniser si nécessaire
+- **Validation de fraîcheur** : 5 minutes max pour données critiques
+- **Éviter les appels API inutiles** : shouldSynchronize() logic
+- **Gérer les modes déconnectés** : fallback sur cache même ancien
 
-## Intégrations Externes
-- **Algolia Search**: Configuration dans `ALGOLIA_CONFIG` pour recherche randonnées
-- **Expo SecureStore**: Stockage JWT tokens
-- **Expo Location**: Géolocalisation avec `LOCATION_CONFIG.accuracy = 6`
-
-## GIT
-- Toujours commiter en français
+### Erreurs de Sérialisation JSON
+- **Objets complexes** : TOUJOURS JSON.stringify avant stockage WatermelonDB
+- **Validation après parse** : try/catch + fallback sur valeur par défaut
+- **Thumbnails** : Gérer les cas string ET object dans la désérialisation
+- **Arrays vides** : `|| []` systématique après JSON.parse
+````
