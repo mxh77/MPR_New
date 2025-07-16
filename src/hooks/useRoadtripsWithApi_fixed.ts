@@ -1,6 +1,12 @@
 /**
  * Hook amélioré pour la gestion des roadtrips avec intégration API
  * Architecture offline-first avec synchronisation backend
+ * 
+ * ✅ CORRECTIONS APPLIQUÉES:
+ * - Suppression des exécutions en double de fetchLocalRoadtrips
+ * - Optimisation de la logique de synchronisation 
+ * - Réduction des logs de debug excessifs
+ * - Évitement des synchronisations inutiles
  */
 import { useState, useCallback, useEffect } from 'react';
 import { useDatabase } from '../contexts/DatabaseContext';
@@ -99,30 +105,17 @@ export const useRoadtripsWithApi = () => {
       setRoadtrips(roadtripsData);
 
       console.log(`✅ ${roadtripsData.length} roadtrips locaux chargés`);
-      
-      // ✅ DEBUG: Détailler les roadtrips chargés
-      console.log('📊 === ROADTRIPS CHARGÉS DEPUIS LE CACHE ===');
-      if (roadtripsData.length === 0) {
-        console.log('   Aucun roadtrip trouvé dans le cache local');
-      } else {
-        roadtripsData.forEach((roadtrip, index) => {
-          console.log(`   [${index + 1}] ID: "${roadtrip.id}" | Titre: "${roadtrip.title}"`);
-          console.log(`        - SyncStatus: ${roadtrip.syncStatus}`);
-          console.log(`        - UserId: "${roadtrip.userId}" (longueur: ${roadtrip.userId?.length})`);
-          console.log(`        - User actuel: "${user._id}" | Match? ${roadtrip.userId === user._id ? '✅ OUI' : '❌ NON'}`);
-          console.log(`        - Dates: ${roadtrip.startDate.toLocaleDateString()} → ${roadtrip.endDate.toLocaleDateString()}`);
-        });
-      }
-      console.log('📊 === FIN ROADTRIPS CHARGÉS ===');
     } catch (err) {
       console.error('❌ Erreur chargement local:', err);
       setError(err instanceof Error ? err.message : 'Erreur chargement local');
     }
   }, [isReady, database, user]);
 
-  // ✅ FONCTION: Résoudre les conflits d'IDs avant sync (version optimisée)
+  /**
+   * Résoudre les conflits d'IDs avant sync (version optimisée)
+   */
   const resolveIdConflicts = useCallback(async () => {
-    if (!database || !user) return;
+    if (!database || !user) return false;
 
     console.log('🔧 Résolution des conflits d\'IDs...');
     
@@ -136,7 +129,7 @@ export const useRoadtripsWithApi = () => {
 
       // Détecter les roadtrips avec IDs courts (générés par WatermelonDB)
       const conflictedRoadtrips = userRoadtrips.filter(roadtrip => {
-        const isShortId = roadtrip.id.length < 20; // IDs WatermelonDB sont courts
+        const isShortId = roadtrip.id.length < 20;
         const isNotMongoId = !/^[0-9a-fA-F]{24}$/.test(roadtrip.id);
         return isShortId || isNotMongoId;
       });
@@ -144,7 +137,7 @@ export const useRoadtripsWithApi = () => {
       if (conflictedRoadtrips.length > 0) {
         console.log(`🔧 ${conflictedRoadtrips.length} roadtrips avec IDs non-MongoDB détectés`);
         
-        // Supprimer les roadtrips avec IDs incompatibles pour éviter les conflits
+        // Supprimer les roadtrips avec IDs incompatibles
         await database.write(async () => {
           for (const roadtrip of conflictedRoadtrips) {
             console.log(`🗑️ Suppression roadtrip avec ID incompatible: ${roadtrip.id} (${roadtrip.title})`);
@@ -165,7 +158,7 @@ export const useRoadtripsWithApi = () => {
   }, [database, user]);
 
   /**
-   * Synchroniser avec l'API (si en ligne) - version optimisée
+   * Synchroniser avec l'API (version optimisée sans logs excessifs)
    */
   const syncWithApi = useCallback(async () => {
     if (!isOnline || !user || syncing || !database) return;
@@ -174,7 +167,7 @@ export const useRoadtripsWithApi = () => {
       setSyncing(true);
       console.log('🔄 Synchronisation avec l\'API...');
 
-      // Résoudre les conflits d'IDs avant de commencer la synchronisation
+      // Résoudre les conflits d'IDs avant synchronisation
       const hasConflicts = await resolveIdConflicts();
       
       // Si des conflits ont été résolus, recharger les données locales
@@ -190,7 +183,7 @@ export const useRoadtripsWithApi = () => {
 
       const roadtripsCollection = database.get<Roadtrip>('roadtrips');
 
-      // Récupérer tous les roadtrips locaux existants d'abord
+      // Récupérer roadtrips locaux existants
       const existingLocalRoadtrips = await roadtripsCollection
         .query(Q.where('user_id', user._id))
         .fetch();
@@ -202,20 +195,17 @@ export const useRoadtripsWithApi = () => {
       // Pour chaque roadtrip de l'API
       for (const apiRoadtrip of apiRoadtrips) {
         try {
-          // ✅ CORRECTION: Convertir ObjectId MongoDB en string
           const mongoIdString = String(apiRoadtrip._id);
-          console.log(`🔍 Synchronisation roadtrip: ${apiRoadtrip.name} (ID: ${mongoIdString})`);
-          
           const thumbnailUrl = extractThumbnailUrl(apiRoadtrip.thumbnail);
           
-          // ✅ CORRECTION: Vérifier l'existence par ID
+          // Vérifier l'existence par ID
           const existingRecord = existingLocalRoadtrips.find(
             local => local.id === mongoIdString
           );
 
           if (existingRecord) {
-            console.log(`📋 Roadtrip ${apiRoadtrip.name} existe déjà (ID: ${existingRecord.id})`);
-            // Pas de mise à jour pour l'instant - éviter les boucles
+            console.log(`📋 Roadtrip ${apiRoadtrip.name} existe déjà`);
+            // Pas de mise à jour pour éviter les boucles
           } else {
             // Créer nouveau roadtrip local
             console.log(`➕ Création nouveau roadtrip: ${apiRoadtrip.name}`);
@@ -230,7 +220,6 @@ export const useRoadtripsWithApi = () => {
                 roadtrip._setRaw('start_location', apiRoadtrip.startLocation || '');
                 roadtrip._setRaw('end_location', apiRoadtrip.endLocation || '');
                 roadtrip._setRaw('currency', apiRoadtrip.currency || 'EUR');
-                // ✅ CRITIQUE: Convertir userId MongoDB (ObjectId) en string
                 const userIdString = apiRoadtrip.userId ? String(apiRoadtrip.userId) : user._id;
                 roadtrip._setRaw('user_id', userIdString);
                 roadtrip._setRaw('is_public', false);
@@ -266,14 +255,13 @@ export const useRoadtripsWithApi = () => {
       console.log('✅ Synchronisation terminée');
     } catch (err) {
       console.error('❌ Erreur synchronisation API:', err);
-      // Ne pas bloquer l'interface pour les erreurs de sync
     } finally {
       setSyncing(false);
     }
   }, [isOnline, user, syncing, database, resolveIdConflicts, fetchLocalRoadtrips]);
 
   /**
-   * Charger les roadtrips (local + sync si online et nécessaire)
+   * Charger les roadtrips (local + sync si nécessaire)
    */
   const fetchRoadtrips = useCallback(async (forceSync: boolean = false) => {
     if (!isReady || !database || !user) return;
@@ -328,14 +316,6 @@ export const useRoadtripsWithApi = () => {
 
       console.log('📍 Création roadtrip:', roadtripData.title);
       
-      // ✅ DEBUG: Vérifier la structure de l'utilisateur local
-      console.log(`👤 User local:`, {
-        id: user._id,
-        type: typeof user._id,
-        length: user._id?.length,
-        isMongoId: /^[0-9a-fA-F]{24}$/.test(user._id || '')
-      });
-
       const roadtripsCollection = database.get<Roadtrip>('roadtrips');
 
       // Création optimiste locale
@@ -428,7 +408,7 @@ export const useRoadtripsWithApi = () => {
       // Mise à jour immédiate de l'état
       setRoadtrips(prev => prev.filter(r => r.id !== roadtripId));
 
-      // ✅ CORRECTION: Utiliser l'ID primaire (qui est maintenant l'ObjectId MongoDB string)
+      // Synchronisation avec l'API
       if (isOnline && roadtripId) {
         try {
           await roadtripsApiService.deleteRoadtrip(roadtripId);
@@ -456,9 +436,6 @@ export const useRoadtripsWithApi = () => {
     }
   }, [isReady, database, user]);
 
-  // ✅ DÉSACTIVÉ: Resync automatique sur changement de statut réseau
-  // pour éviter les synchronisations inutiles
-
   return {
     roadtrips,
     loading,
@@ -474,7 +451,7 @@ export const useRoadtripsWithApi = () => {
 
     // Actions spécifiques
     refreshRoadtrips: () => fetchRoadtrips(true), // Force la synchronisation
-    resolveIdConflicts, // ✅ NOUVEAU: Résoudre les conflits d'IDs
+    resolveIdConflicts, // Résoudre les conflits d'IDs
 
     // Stats
     totalRoadtrips: roadtrips.length,
