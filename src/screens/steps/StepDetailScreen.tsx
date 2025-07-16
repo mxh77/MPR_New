@@ -23,7 +23,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 
 import { useTheme } from '../../contexts';
-import { getStepById } from '../../services/api/steps';
+import { useStepDetail } from '../../hooks/useStepDetail';
 import type { Step } from '../../types';
 import type { ApiStep } from '../../services/api/roadtrips';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
@@ -52,11 +52,15 @@ const StepDetailScreen: React.FC = () => {
   const route = useRoute();
   const { stepId, roadtripId } = route.params as RouteParams;
 
-  // États principaux
-  const [step, setStep] = useState<ApiStep | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Hook offline-first pour les détails de l'étape
+  const { 
+    step, 
+    loading, 
+    syncing, 
+    error, 
+    fetchStepDetail, 
+    refreshStepDetail 
+  } = useStepDetail(stepId);
 
   // États pour les onglets
   const [tabIndex, setTabIndex] = useState(0);
@@ -65,6 +69,13 @@ const StepDetailScreen: React.FC = () => {
   ]);
 
   console.log('StepDetailScreen - stepId:', stepId, 'roadtripId:', roadtripId);
+  console.log('🔧 StepDetailScreen - États:', { 
+    hasStep: !!step, 
+    loading, 
+    syncing, 
+    error: !!error,
+    stepName: step?.name 
+  });
 
   /**
    * Fonction pour extraire l'URI de l'image depuis l'objet thumbnail
@@ -100,63 +111,51 @@ const StepDetailScreen: React.FC = () => {
   };
 
   /**
-   * Charge les détails de l'étape depuis l'API
+   * Effet pour configurer les onglets selon le contenu de l'étape
    */
-  const fetchStepDetails = useCallback(async () => {
-    try {
-      setError(null);
-      console.log('📍 Chargement détails étape:', stepId);
-      
-      const stepData = await getStepById(stepId);
-      console.log('📍 Étape récupérée:', stepData);
-      
-      setStep(stepData);
-      
-      // Configurer les onglets selon le type d'étape et le contenu
-      const newRoutes: TabRoute[] = [
-        { key: 'info', title: 'Infos', icon: 'information-circle' },
-      ];
+  useEffect(() => {
+    if (!step) return;
 
-      // Ajouter l'onglet Hébergements si c'est une étape Stage avec des accommodations
-      const stepWithData = stepData as ApiStep;
-      if (stepData.type === 'Stage' && stepWithData.accommodations?.length > 0) {
-        newRoutes.push({
-          key: 'accommodations',
-          title: 'Hébergements',
-          icon: 'bed',
-          badge: stepWithData.accommodations.length
-        });
-      }
+    // Configurer les onglets selon le type d'étape et le contenu
+    const newRoutes: TabRoute[] = [
+      { key: 'info', title: 'Infos', icon: 'information-circle' },
+    ];
 
-      // Ajouter l'onglet Activités si il y en a
-      if (stepWithData.activities?.length > 0) {
-        newRoutes.push({
-          key: 'activities',
-          title: 'Activités',
-          icon: 'walk',
-          badge: stepWithData.activities.length
-        });
-      }
-
-      setRoutes(newRoutes);
-
-    } catch (err) {
-      console.error('Erreur lors du chargement de l\'étape:', err);
-      setError('Impossible de charger les détails de l\'étape');
+    // Ajouter l'onglet Hébergements si c'est une étape Stage avec des accommodations
+    if (step.type === 'Stage' && step.accommodations?.length > 0) {
+      newRoutes.push({
+        key: 'accommodations',
+        title: 'Hébergements',
+        icon: 'bed',
+        badge: step.accommodations.length
+      });
     }
-  }, [stepId]);
+
+    // Ajouter l'onglet Activités si il y en a
+    if (step.activities?.length > 0) {
+      newRoutes.push({
+        key: 'activities',
+        title: 'Activités',
+        icon: 'walk',
+        badge: step.activities.length
+      });
+    }
+
+    setRoutes(newRoutes);
+  }, [step]);
 
   /**
-   * Rafraîchissement manuel
+   * Chargement initial avec useFocusEffect pour rechargement au focus
    */
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await fetchStepDetails();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [fetchStepDetails]);
+  useFocusEffect(
+    useCallback(() => {
+      // Conditions strictes selon nos instructions Copilot anti-appels multiples
+      if (!step && !loading && !syncing) {
+        console.log('🔧 StepDetailScreen - useFocusEffect: Chargement initial des détails');
+        fetchStepDetail();
+      }
+    }, [step, loading, syncing, fetchStepDetail])
+  );
 
   /**
    * Navigation vers l'édition
@@ -187,15 +186,10 @@ const StepDetailScreen: React.FC = () => {
 
   // Chargement initial
   useEffect(() => {
-    fetchStepDetails();
-  }, [fetchStepDetails]);
+    fetchStepDetail();
+  }, [fetchStepDetail]);
 
-  // Mise à jour du loading state
-  useEffect(() => {
-    if (step) {
-      setLoading(false);
-    }
-  }, [step]);
+  // Mise à jour du loading state - supprimé car géré par le hook
 
   /**
    * Rendu de l'onglet Informations
@@ -205,8 +199,8 @@ const StepDetailScreen: React.FC = () => {
       style={styles.tabContent}
       refreshControl={
         <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
+          refreshing={syncing}
+          onRefresh={refreshStepDetail}
           colors={[theme.colors.primary]}
           tintColor={theme.colors.primary}
         />
@@ -541,7 +535,7 @@ const StepDetailScreen: React.FC = () => {
           </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
-            onPress={handleRefresh}
+            onPress={refreshStepDetail}
           >
             <Text style={[styles.retryButtonText, { color: theme.colors.white }]}>
               Réessayer
