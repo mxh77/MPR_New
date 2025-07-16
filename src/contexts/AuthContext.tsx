@@ -3,7 +3,7 @@
  */
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { authService } from '../services';
-import { loginUser, registerUser, checkAuthStatus, forgotPassword, type AuthUser } from '../services/api/auth';
+import { loginUser, registerUser, checkAuthStatus, forgotPassword, getCurrentUser, type AuthUser } from '../services/api/auth';
 import { ENV_CONFIG } from '../config';
 import type { User, RegisterData } from '../types';
 
@@ -129,12 +129,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const restoreSession = async () => {
       try {
+        // ✅ CORRECTION: Récupérer le statut auth qui peut inclure les données utilisateur depuis cookies
+        try {
+          const authStatus = await checkAuthStatus();
+          
+          if (authStatus.isAuthenticated && authStatus.user) {
+            // Convertir les données utilisateur depuis les cookies
+            const authUser: AuthUser = {
+              _id: authStatus.user._id,
+              name: authStatus.user.name,
+              email: authStatus.user.email,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            
+            const user = convertAuthUserToUser(authUser);
+            const token = 'cookie-based-auth';
+            
+            // Mettre à jour le stockage local avec les bonnes données
+            await authService.saveUser(user);
+            
+            console.log('🔄 Session restaurée avec données cookies:', { userId: user._id, email: user.email });
+            
+            dispatch({
+              type: 'RESTORE_SESSION',
+              payload: { user, token },
+            });
+            return;
+          } else if (authStatus.isAuthenticated) {
+            // Fallback: essayer getCurrentUser si authentifié mais pas de données dans status
+            const authUser = await getCurrentUser();
+            if (authUser) {
+              const user = convertAuthUserToUser(authUser);
+              const token = 'cookie-based-auth';
+              
+              await authService.saveUser(user);
+              
+              console.log('🔄 Session restaurée avec getCurrentUser:', { userId: user._id, email: user.email });
+              
+              dispatch({
+                type: 'RESTORE_SESSION',
+                payload: { user, token },
+              });
+              return;
+            }
+          }
+        } catch (apiError) {
+          console.log('📡 API non disponible, tentative avec données locales...');
+        }
+        
+        // Fallback : utiliser les données locales seulement si l'API échoue
         const [user, token] = await Promise.all([
           authService.getUser(),
           authService.getToken(),
         ]);
 
         if (user && token) {
+          console.log('📱 Session restaurée avec données locales:', { userId: user._id, email: user.email });
           dispatch({
             type: 'RESTORE_SESSION',
             payload: { user, token },

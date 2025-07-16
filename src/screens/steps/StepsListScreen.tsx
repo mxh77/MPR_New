@@ -303,7 +303,6 @@ const StepsListScreen: React.FC = () => {
 
   // Fonction pour extraire l'URI de l'image (basée sur l'app existante)
   const getImageUri = (thumbnail: any): string | null => {
-    console.log('🖼️ getImageUri - thumbnail reçu:', typeof thumbnail, thumbnail);
     console.log('🖼️ getImageUri - thumbnail reçu:', typeof thumbnail);
     
     if (!thumbnail) {

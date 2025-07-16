@@ -70,32 +70,32 @@ const StepDetailScreen: React.FC = () => {
    * Fonction pour extraire l'URI de l'image depuis l'objet thumbnail
    */
   const getImageUri = (thumbnail: any): string | null => {
-    console.log('🖼️ StepDetailScreen - getImageUri - thumbnail reçu:', typeof thumbnail, thumbnail);
+    console.log('🖼️ StepDetailScreen - getImageUri - thumbnail reçu:');
     
     if (!thumbnail) {
-      console.log('🖼️ StepDetailScreen - getImageUri - thumbnail null/undefined');
+      // console.log('🖼️ StepDetailScreen - getImageUri - thumbnail null/undefined');
       return null;
     }
     
     // Si c'est déjà une chaîne
     if (typeof thumbnail === 'string') {
-      console.log('🖼️ StepDetailScreen - getImageUri - string:', thumbnail);
+      // console.log('🖼️ StepDetailScreen - getImageUri - string:', thumbnail);
       return thumbnail;
     }
     
     // Si c'est un objet avec une propriété url (structure API)
     if (typeof thumbnail === 'object' && thumbnail.url && typeof thumbnail.url === 'string') {
-      console.log('🖼️ StepDetailScreen - getImageUri - object.url:', thumbnail.url);
+      // console.log('🖼️ StepDetailScreen - getImageUri - object.url:', thumbnail.url);
       return thumbnail.url;
     }
     
     // Si c'est un objet avec une propriété uri
     if (typeof thumbnail === 'object' && thumbnail.uri && typeof thumbnail.uri === 'string') {
-      console.log('🖼️ StepDetailScreen - getImageUri - object.uri:', thumbnail.uri);
+      // console.log('🖼️ StepDetailScreen - getImageUri - object.uri:', thumbnail.uri);
       return thumbnail.uri;
     }
     
-    console.log('🖼️ StepDetailScreen - getImageUri - Aucun format reconnu pour:', thumbnail);
+    // console.log('🖼️ StepDetailScreen - getImageUri - Aucun format reconnu pour:', thumbnail);
     return null;
   };
 

@@ -39,7 +39,6 @@ export const RoadtripDetailScreen: React.FC<RoadtripDetailScreenProps> = () => {
 
   // Debug: Log de l'ID du roadtrip dans RoadtripDetailScreen
   console.log('RoadtripDetailScreen - roadtripId:', roadtripId);
-  console.log('RoadtripDetailScreen - roadtrip object:', roadtrip?.id, roadtrip?.title);
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('fr-FR', {
@@ -64,11 +63,10 @@ export const RoadtripDetailScreen: React.FC<RoadtripDetailScreenProps> = () => {
 
   const handleViewSteps = () => {
     console.log('handleViewSteps - roadtripId local:', roadtripId);
-    console.log('handleViewSteps - roadtrip objet:', roadtrip);
-    console.log('handleViewSteps - serverId:', roadtrip?.serverId);
+    console.log('handleViewSteps - serverId:', roadtrip?.id);
     
     // Utilise le serverId du roadtrip car c'est ce que le backend attend
-    const serverRoadtripId = roadtrip?.serverId;
+    const serverRoadtripId = roadtrip?.id;
     
     if (!serverRoadtripId) {
       Alert.alert(

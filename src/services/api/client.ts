@@ -88,8 +88,8 @@ const createApiClient = (): AxiosInstance => {
       if (ENV_CONFIG.DEBUG_API_CALLS) {
         console.log('API Response:', {
           status: response.status,
-          url: response.config.url,
-          data: response.data,
+          // url: response.config.url,
+          // data: response.data,
         });
       }
       return response;

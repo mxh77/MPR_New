@@ -31,7 +31,6 @@ export default class Roadtrip extends BaseModel {
   @field('tags') tagsJson!: string;
   @field('photos') photosJson!: string;
   @field('documents') documentsJson!: string;
-  @field('server_id') serverId?: string;
 
   @children('steps') steps: any;
   @children('roadtrip_tasks') tasks: any;
@@ -115,7 +114,6 @@ export default class Roadtrip extends BaseModel {
       tags: this.tags,
       photos: this.photos,
       documents: this.documents,
-      serverId: this.serverId,
       syncStatus: this.customSyncStatus as any,
       lastSyncAt: this.lastSyncAt,
       createdAt: this.createdAt,

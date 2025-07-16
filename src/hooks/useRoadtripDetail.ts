@@ -24,7 +24,6 @@ interface RoadtripData {
   tags: string[];
   photos?: string[];
   documents?: string[];
-  serverId?: string;
   syncStatus?: 'pending' | 'synced' | 'error';
   lastSyncAt?: Date;
   createdAt: Date;
@@ -58,7 +57,6 @@ export const useRoadtripDetail = (roadtripId: string) => {
     tags: record.tags,
     photos: record.photos,
     documents: record.documents,
-    serverId: record.serverId,
     syncStatus: record.customSyncStatus as 'pending' | 'synced' | 'error',
     lastSyncAt: record.lastSyncAt ? new Date(record.lastSyncAt) : undefined,
     createdAt: record.createdAt,

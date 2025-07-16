@@ -97,7 +97,7 @@ const shouldSynchronizeSteps = async (roadtripId: string): Promise<boolean> => {
     }
 
     // Vérifier s'il y a des éléments en attente de synchronisation
-    const pendingSteps = localSteps.filter(step => 
+    const pendingSteps = localSteps.filter(step =>
       step.customSyncStatus === 'pending' || step.customSyncStatus === 'error'
     );
 
@@ -160,11 +160,11 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
       steps: [],
       loading: false,
       error: 'ID du roadtrip invalide',
-      refreshSteps: async () => {},
+      refreshSteps: async () => { },
       createStepOptimistic: async () => ({} as Step),
-      updateStepOptimistic: async () => {},
-      deleteStepOptimistic: async () => {},
-      reorderStepsOptimistic: async () => {},
+      updateStepOptimistic: async () => { },
+      deleteStepOptimistic: async () => { },
+      reorderStepsOptimistic: async () => { },
     };
   }
 
@@ -174,7 +174,7 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
   const loadLocalSteps = useCallback(async () => {
     try {
       console.log('�️ CACHE - Chargement steps locaux pour roadtripId:', roadtripId);
-      
+
       const stepsCollection = database.get<StepModel>('steps');
       const localSteps = await stepsCollection
         .query(Q.where('roadtrip_id', roadtripId))
@@ -186,12 +186,12 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
         .map((step, index) => {
           try {
             const stepInterface = step.toInterface();
-            
+
             // Attacher les données API additionnelles depuis WatermelonDB
             (stepInterface as any).travelTimePreviousStep = step.travelTimePreviousStep;
             (stepInterface as any).distancePreviousStep = step.distancePreviousStep;
             (stepInterface as any).travelTimeNote = step.travelTimeNote || 'OK';
-            
+
             console.log('🗄️ CACHE - Step récupéré du cache:', {
               title: stepInterface.title,
               thumbnail: stepInterface.thumbnail ? 'présente' : 'absente',
@@ -244,14 +244,14 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
 
     try {
       console.log('🌐 API - Début synchronisation pour roadtripId:', roadtripId);
-      
+
       // Récupération depuis l'API
       const apiSteps = await getStepsByRoadtrip(roadtripId);
-      
+
       console.log('🌐 API - Étapes récupérées:', apiSteps.length);
       console.log('🌐 API - ✅ DONNÉES API UTILISÉES (synchronisation)');
       console.log('🌐 API - Première étape (exemple):', apiSteps[0]);
-      
+
       // Conversion directe des données API en Steps avec toutes les données
       const convertedSteps = apiSteps
         .map(convertApiStepToStep)
@@ -272,7 +272,7 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
       try {
         await database.write(async () => {
           const stepsCollection = database.get<StepModel>('steps');
-          
+
           // Supprime les étapes existantes pour ce roadtrip
           const existingSteps = await stepsCollection
             .query(Q.where('roadtrip_id', roadtripId))
@@ -291,12 +291,12 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
               console.warn('Step ignoré - données incomplètes:', apiStep?._id || 'ID manquant');
               continue;
             }
-            
+
             try {
               // Log pour vérifier le type de l'API
               console.log('🔧 WatermelonDB - Type API reçu:', apiStep.type, 'pour step:', apiStep.name);
-              console.log('🔧 WatermelonDB - Thumbnail API:', apiStep.thumbnail ? 'présente' : 'absente', apiStep.thumbnail);
-              
+              console.log('🔧 WatermelonDB - Thumbnail API:', apiStep.thumbnail ? 'présente' : 'absente');
+
               // Sérialisation correcte de la thumbnail (objet → string)
               let thumbnailString = '';
               if (apiStep.thumbnail) {
@@ -308,7 +308,7 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
                   thumbnailString = JSON.stringify(apiStep.thumbnail);
                 }
               }
-              
+
               // Préparation complète des données AVANT la closure (version minimale)
               const rawData = {
                 user_id: apiStep.userId || 'unknown',
@@ -337,10 +337,12 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
                 // Note: sync_status et last_sync_at gérés par BaseModel
               };
 
+              const mongoIdString = String(apiStep._id);
+
               // Création avec ObjectId MongoDB comme ID primaire
               await stepsCollection.create((step: StepModel) => {
                 // CRITIQUE: Utiliser l'ObjectId MongoDB comme ID primaire
-                step._setRaw('id', apiStep._id);
+                step._raw.id = mongoIdString;
                 step._setRaw('user_id', rawData.user_id);
                 step._setRaw('roadtrip_id', rawData.roadtrip_id);
                 step._setRaw('type', rawData.type);
@@ -364,14 +366,14 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
                 step._setRaw('created_at', rawData.created_at);
                 step._setRaw('updated_at', rawData.updated_at);
               });
-              
+
               console.log('✅ Step sauvegardé en local:', rawData.name);
             } catch (stepErr) {
               console.warn('Erreur création step en base locale:', stepErr);
               // Continue même si la sauvegarde locale échoue
             }
           }
-          
+
           console.log('✅ Synchronisation locale terminée avec timestamp:', new Date(syncTimestamp).toISOString());
         });
       } catch (dbErr) {
@@ -381,7 +383,7 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
 
     } catch (err) {
       console.error('Erreur lors de la synchronisation des étapes:', err);
-      
+
       // Si c'est une erreur 404, c'est normal (pas encore d'étapes)
       if (err && typeof err === 'object' && 'status' in err && err.status === 404) {
         setError(null);
@@ -389,7 +391,7 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
         console.log('Aucune étape trouvée pour ce roadtrip (normal)');
       } else {
         setError('Erreur lors de la synchronisation');
-        
+
         // En cas d'erreur, charge quand même les données locales
         await loadLocalSteps();
       }
@@ -428,6 +430,10 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
         step._setRaw('travel_time_note', 'OK');
         step._setRaw('thumbnail', '');
         step._setRaw('story', '');
+        step._setRaw('sync_status', 'pending');
+        step._setRaw('last_sync_at', Date.now());
+        step._setRaw('created_at', Date.now());
+        step._setRaw('updated_at', Date.now());
       });
     });
 
@@ -450,21 +456,21 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
     // Mise à jour optimiste
     setSteps(prev => prev.map(step => {
       if (step._id === stepId) {
-        const updatedStep: Step = { 
+        const updatedStep: Step = {
           ...step,
           title: stepData.name || step.title,
           description: stepData.notes !== undefined ? stepData.notes : step.description,
           updatedAt: new Date(),
           syncStatus: 'pending'
         };
-        
+
         if (stepData.arrivalDateTime) {
           updatedStep.startDate = new Date(stepData.arrivalDateTime);
         }
         if (stepData.departureDateTime) {
           updatedStep.endDate = new Date(stepData.departureDateTime);
         }
-        
+
         return updatedStep;
       }
       return step;
@@ -474,7 +480,7 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
     await database.write(async () => {
       const stepsCollection = database.get<StepModel>('steps');
       const step = await stepsCollection.find(stepId);
-      
+
       await step.update((s: StepModel) => {
         if (stepData.name) s._setRaw('name', stepData.name);
         if (stepData.notes !== undefined) s._setRaw('notes', stepData.notes);
@@ -542,10 +548,10 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
     const initializeSteps = async () => {
       // Toujours charger d'abord les données locales (offline-first)
       await loadLocalSteps();
-      
+
       // Vérifier la fraîcheur des données et la connectivité
       const shouldSync = await shouldSynchronizeSteps(roadtripId);
-      
+
       if (shouldSync) {
         console.log('📍 ⚡ DÉCISION: Données pas à jour ou connectivité OK - Synchronisation API');
         refreshSteps(false); // Ne bloque pas l'UI, se fait en arrière-plan
@@ -553,7 +559,7 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
         console.log('📍 ✅ DÉCISION: Données locales à jour - Pas de synchronisation API');
       }
     };
-    
+
     initializeSteps();
   }, [roadtripId]); // Dépendance uniquement sur roadtripId
 
