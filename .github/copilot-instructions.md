@@ -7,8 +7,9 @@
 2. [Structure de Fichiers](#structure-de-fichiers-critique)
 3. [🚨 SCHÉMAS CRITIQUES](#️-schémas-de-données---règles-critiques-️)
 4. [Règles de Développement](#règles-de-développement-strictes)
-5. [📊 MONGODB RÉFÉRENCE](#-schémas-mongodb---référence-obligatoire)
-6. [Patterns Spécifiques](#patterns-darchitecture-spécifiques)
+5. [🆔 GESTION DES IDS CRITIQUES](#️-gestion-des-ids-mongodb--watermelondb---règles-critiques-️)
+6. [📊 MONGODB RÉFÉRENCE](#-schémas-mongodb---référence-obligatoire)
+7. [Patterns Spécifiques](#patterns-darchitecture-spécifiques)
 
 ---
 
@@ -174,754 +175,317 @@ thumbnail: Object           →  thumbnail (JSON string)
   debugDateTimezone(date, 'Ma date à analyser');
   ```
 
-## 📊 SCHÉMAS MONGODB - RÉFÉRENCE OBLIGATOIRE
+### ⚠️ GESTION DES IDS MONGODB ↔ WATERMELONDB - RÈGLES CRITIQUES ⚠️
 
-### ⚠️ RÈGLE CRITIQUE : Consulter `.github/mongodb-reference.md` pour les détails complets
+#### Problème Fondamental
+- **MongoDB** utilise des ObjectIds de 24 caractères hexadécimaux (ex: `"673abc123def456789012345"`)
+- **WatermelonDB** génère automatiquement des IDs courts alphanumériques (ex: `"9KTT5LUsozsPVPeV"`)
+- **ERREUR CRITIQUE** : Si WatermelonDB génère ses propres IDs, l'API échoue avec "Cast to ObjectId failed"
 
-### Types API Exacts (Source de vérité)
-- `StepType`: `"Stage" | "Stop"` (EXACTEMENT ces valeurs)
-- `ActivityType`: `"hiking" | "visit" | "restaurant" | "accommodation" | "transport" | "other"`
-- `TravelTimeNote`: `"ERROR" | "WARNING" | "OK"`
+#### Règles Obligatoires pour Éviter les Erreurs d'ID
 
-### Mapping API → WatermelonDB CRITIQUE
-- `arrivalDateTime` (ISO string) → `arrival_date_time` (timestamp)
-- `activities` (Array<ObjectId>) → `activities` (JSON string)
-- `thumbnail` (File Object) → `thumbnail` (JSON string)
-
-### Règles de Validation
-- **Stage** = peut avoir accommodations + activities
-- **Stop** = JAMAIS d'accommodations/activities  
-- **Thumbnail** = toujours objet `{_id, url, type, fileId}`
-
-### � Documentation Complète
-- **Référence rapide** : `.github/mongodb-reference.md` (à attacher si besoin)
-- **Documentation complète** : `Refonte/DOCUMENTATION_MODELES.md`
-
-# RÉFÉRENCE RAPIDE - MODÈLES MONGODB MPR_New
-
-> 📋 **Utilisation** : Attachez ce fichier dans vos conversations Copilot quand vous travaillez sur les données
-
-## 🎯 Types API Exacts (à utiliser tel quel)
-
-### Step Types
+##### 1. TOUJOURS Préserver les ObjectIds MongoDB comme Primary Keys WatermelonDB
 ```typescript
-type: "Stage" | "Stop"  // ⚠️ EXACTEMENT ces valeurs
-```
-
-### Activity Types
-```typescript
-type: "hiking" | "visit" | "restaurant" | "accommodation" | "transport" | "other"
-```
-
-### Travel Time Notes
-```typescript
-travelTimeNote: "ERROR" | "WARNING" | "OK"  // ⚠️ EXACTEMENT ces valeurs
-```
-
-## 📋 SCHÉMAS MONGODB COMPLETS
-
-# Documentation des Modèles - MonPetitRoadtrip
-
-Cette documentation présente tous les modèles de données utilisés dans l'application MonPetitRoadtrip.
-
-## Table des Matières
-
-1. [Modèles Principaux](#modèles-principaux)
-   - [User](#user)
-   - [Roadtrip](#roadtrip)
-   - [Step](#step)
-   - [Activity](#activity)
-   - [Accommodation](#accommodation)
-2. [Modèles de Fichiers](#modèles-de-fichiers)
-   - [File](#file)
-3. [Modèles de Communication](#modèles-de-communication)
-   - [ChatHistory](#chathistory)
-   - [Notification](#notification)
-4. [Modèles de Configuration](#modèles-de-configuration)
-   - [UserSetting](#usersetting)
-5. [Modèles de Tâches](#modèles-de-tâches)
-   - [RoadtripTask](#roadtriptask)
-6. [Modèles de Jobs/Traitement Asynchrone](#modèles-de-jobstraitement-asynchrone)
-   - [AIRoadtripJob](#airoadtripjob)
-   - [ChatbotJob](#chatbotjob)
-   - [StepSyncJob](#stepsyncjob)
-   - [TravelTimeJob](#traveltimejob)
-   - [TaskGenerationJob](#taskgenerationjob)
-   - [StepStoryJob](#stepstoryjob)
-   - [AITaskJob](#aitaskjob)
-7. [Modèles Dépréciés](#modèles-dépréciés)
-   - [Stage](#stage-déprécié)
-   - [Stop](#stop-déprécié)
-
----
-
-## Modèles Principaux
-
-### User
-**Fichier :** `server/models/User.js`
-
-Modèle représentant les utilisateurs de l'application.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `username` | String | ✅ | Nom d'utilisateur unique |
-| `email` | String | ✅ | Adresse email unique |
-| `password` | String | ✅ | Mot de passe haché |
-| `resetPasswordToken` | String | ❌ | Token de réinitialisation de mot de passe |
-| `resetPasswordExpires` | Date | ❌ | Date d'expiration du token |
-| `dateCreated` | Date | ❌ | Date de création du compte (défaut: maintenant) |
-
-**Relations :**
-- Un utilisateur peut avoir plusieurs roadtrips
-- Un utilisateur peut avoir des paramètres personnalisés (UserSetting)
-
----
-
-### Roadtrip
-**Fichier :** `server/models/Roadtrip.js`
-
-Modèle principal représentant un voyage.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur propriétaire |
-| `name` | String | ✅ | Nom du roadtrip |
-| `startLocation` | String | ❌ | Lieu de départ |
-| `startDateTime` | Date | ❌ | Date/heure de départ |
-| `endLocation` | String | ❌ | Lieu d'arrivée |
-| `endDateTime` | Date | ❌ | Date/heure d'arrivée |
-| `currency` | String | ❌ | Devise (défaut: 'EUR') |
-| `notes` | String | ❌ | Notes générales |
-| `photos` | [ObjectId] | ❌ | Références vers des fichiers photo |
-| `documents` | [ObjectId] | ❌ | Références vers des documents |
-| `thumbnail` | ObjectId | ❌ | Image de miniature |
-| `steps` | [ObjectId] | ❌ | Liste des étapes du roadtrip |
-
-**Relations :**
-- Appartient à un utilisateur (User)
-- Contient plusieurs étapes (Step)
-- Peut contenir des fichiers (File)
-
----
-
-### Step
-**Fichier :** `server/models/Step.js`
-
-Modèle représentant une étape du roadtrip (remplace Stage/Stop).
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `roadtripId` | ObjectId | ✅ | Référence vers le roadtrip |
-| `type` | String | ❌ | Type d'étape ('Stage' ou 'Stop') |
-| `name` | String | ❌ | Nom de l'étape |
-| `address` | String | ❌ | Adresse de l'étape |
-| `latitude` | Number | ❌ | Coordonnée latitude |
-| `longitude` | Number | ❌ | Coordonnée longitude |
-| `arrivalDateTime` | Date | ❌ | Date/heure d'arrivée |
-| `departureDateTime` | Date | ❌ | Date/heure de départ |
-| `travelTimePreviousStep` | Number | ❌ | Temps de trajet depuis l'étape précédente |
-| `distancePreviousStep` | Number | ❌ | Distance depuis l'étape précédente |
-| `isArrivalTimeConsistent` | Boolean | ❌ | Cohérence des horaires (défaut: true) |
-| `travelTimeNote` | String | ❌ | Note sur le temps de trajet ('ERROR', 'WARNING', 'OK') |
-| `notes` | String | ❌ | Notes sur l'étape |
-| `photos` | [ObjectId] | ❌ | Photos de l'étape |
-| `documents` | [ObjectId] | ❌ | Documents liés |
-| `thumbnail` | ObjectId | ❌ | Image miniature |
-| `accommodations` | [ObjectId] | ❌ | Hébergements (seulement si type='Stage') |
-| `activities` | [ObjectId] | ❌ | Activités (seulement si type='Stage') |
-| `story` | String | ❌ | Récit généré par IA |
-
-**Validations :**
-- Les hébergements et activités ne sont autorisés que pour les étapes de type 'Stage'
-
-**Relations :**
-- Appartient à un utilisateur (User) et un roadtrip (Roadtrip)
-- Peut contenir des hébergements (Accommodation) et activités (Activity)
-
----
-
-### Activity
-**Fichier :** `server/models/Activity.js`
-
-Modèle représentant une activité dans une étape.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `stepId` | ObjectId | ✅ | Référence vers l'étape |
-| `active` | Boolean | ❌ | Activité active/archivée (défaut: true) |
-| `type` | String | ❌ | Type d'activité ('Randonnée', 'Courses', 'Visite', 'Transport', 'Autre') |
-| `name` | String | ✅ | Nom de l'activité |
-| `address` | String | ❌ | Adresse de l'activité |
-| `latitude` | Number | ❌ | Coordonnée latitude |
-| `longitude` | Number | ❌ | Coordonnée longitude |
-| `website` | String | ❌ | Site web |
-| `phone` | String | ❌ | Numéro de téléphone |
-| `email` | String | ❌ | Email de contact |
-| `startDateTime` | Date | ❌ | Date/heure de début |
-| `endDateTime` | Date | ❌ | Date/heure de fin |
-| `duration` | Number | ❌ | Durée de l'activité |
-| `typeDuration` | String | ❌ | Unité de durée ('M', 'H', 'J') |
-| `reservationNumber` | String | ❌ | Numéro de réservation |
-| `price` | Number | ❌ | Prix de l'activité |
-| `currency` | String | ❌ | Devise ('USD', 'CAD', 'EUR') |
-| `trailDistance` | Number | ❌ | Distance de randonnée (km) |
-| `trailElevation` | Number | ❌ | Dénivelé de randonnée (m) |
-| `trailType` | String | ❌ | Type de sentier |
-| `notes` | String | ❌ | Notes sur l'activité |
-| `photos` | [ObjectId] | ❌ | Photos de l'activité |
-| `documents` | [ObjectId] | ❌ | Documents liés |
-| `thumbnail` | ObjectId | ❌ | Image miniature |
-| `algoliaId` | String | ❌ | ID Algolia pour la recherche |
-
-**Relations :**
-- Appartient à un utilisateur (User) et une étape (Step)
-
----
-
-### Accommodation
-**Fichier :** `server/models/Accommodation.js`
-
-Modèle représentant un hébergement dans une étape.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `stepId` | ObjectId | ✅ | Référence vers l'étape |
-| `active` | Boolean | ❌ | Hébergement actif/archivé (défaut: true) |
-| `name` | String | ✅ | Nom de l'hébergement |
-| `address` | String | ❌ | Adresse de l'hébergement |
-| `latitude` | Number | ❌ | Coordonnée latitude |
-| `longitude` | Number | ❌ | Coordonnée longitude |
-| `website` | String | ❌ | Site web |
-| `phone` | String | ❌ | Numéro de téléphone |
-| `email` | String | ❌ | Email de contact |
-| `reservationNumber` | String | ❌ | Numéro de réservation |
-| `confirmationDateTime` | Date | ❌ | Date/heure de confirmation |
-| `arrivalDateTime` | Date | ❌ | Date/heure d'arrivée |
-| `departureDateTime` | Date | ❌ | Date/heure de départ |
-| `nights` | Number | ❌ | Nombre de nuits |
-| `price` | Number | ❌ | Prix de l'hébergement |
-| `currency` | String | ❌ | Devise ('USD', 'CAD', 'EUR') |
-| `notes` | String | ❌ | Notes sur l'hébergement |
-| `photos` | [ObjectId] | ❌ | Photos de l'hébergement |
-| `documents` | [ObjectId] | ❌ | Documents liés |
-| `thumbnail` | ObjectId | ❌ | Image miniature |
-
-**Relations :**
-- Appartient à un utilisateur (User) et une étape (Step)
-
----
-
-## Modèles de Fichiers
-
-### File
-**Fichier :** `server/models/File.js`
-
-Modèle représentant les fichiers (photos, documents, thumbnails).
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `fileId` | String | ❌ | Identifiant unique UUID |
-| `name` | String | ❌ | Nom du fichier |
-| `url` | String | ✅ | URL d'accès au fichier |
-| `type` | String | ✅ | Type de fichier ('photo', 'document', 'thumbnail') |
-| `createdAt` | Date | ❌ | Date de création (défaut: maintenant) |
-
-**Relations :**
-- Peut être référencé par Roadtrip, Step, Activity, Accommodation
-
----
-
-## Modèles de Communication
-
-### ChatHistory
-**Fichier :** `server/models/ChatHistory.js`
-
-Modèle gérant l'historique des conversations avec le chatbot.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `roadtripId` | ObjectId | ✅ | Référence vers le roadtrip |
-| `conversationId` | String | ✅ | Identifiant unique de conversation |
-| `messages` | Array | ❌ | Liste des messages |
-| `context` | Object | ❌ | Contexte de la conversation |
-| `title` | String | ❌ | Titre de la conversation |
-| `summary` | String | ❌ | Résumé de la conversation |
-| `isActive` | Boolean | ❌ | Conversation active (défaut: true) |
-
-**Structure des messages :**
-- `role`: 'user', 'assistant', 'system'
-- `content`: Contenu du message
-- `timestamp`: Horodatage
-- `intent`: Intention détectée (pour assistant)
-- `entities`: Entités extraites
-- `jobId`: Référence vers le job associé
-
-**Méthodes :**
-- `addMessage(role, content, metadata)`: Ajouter un message
-- `generateTitle()`: Générer un titre automatiquement
-
----
-
-### Notification
-**Fichier :** `server/models/Notification.js`
-
-Modèle gérant les notifications utilisateur.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `roadtripId` | ObjectId | ❌ | Référence vers le roadtrip (optionnel) |
-| `type` | String | ✅ | Type ('chatbot_success', 'chatbot_error', 'system', 'reminder') |
-| `title` | String | ✅ | Titre de la notification |
-| `message` | String | ✅ | Message de la notification |
-| `icon` | String | ❌ | Icône ('success', 'error', 'warning', 'info') |
-| `data` | Mixed | ❌ | Données additionnelles |
-| `relatedJobId` | ObjectId | ❌ | Référence vers un job |
-| `read` | Boolean | ❌ | Notification lue (défaut: false) |
-| `readAt` | Date | ❌ | Date de lecture |
-| `expiresAt` | Date | ❌ | Expiration automatique (7 jours) |
-
-**Fonctionnalités :**
-- Expiration automatique après 7 jours
-- Index pour optimiser les performances
-- Support TTL MongoDB
-
----
-
-## Modèles de Configuration
-
-### UserSetting
-**Fichier :** `server/models/UserSetting.js`
-
-Modèle gérant les paramètres personnalisés de l'utilisateur.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur (unique) |
-| `systemPrompt` | String | ❌ | Prompt système personnalisé pour l'IA |
-| `algoliaSearchRadius` | Number | ❌ | Rayon de recherche Algolia (1km-200km, défaut: 50km) |
-| `dragSnapInterval` | Number | ❌ | Intervalle de déplacement planning (5,10,15,30,60 min) |
-| `enablePhotosInStories` | Boolean | ❌ | Activer l'analyse photos dans les récits (défaut: true) |
-
-**Contraintes :**
-- Un seul paramétrage par utilisateur
-- Rayon Algolia limité entre 1km et 200km
-- Intervalles de déplacement prédéfinis
-
----
-
-## Modèles de Tâches
-
-### RoadtripTask
-**Fichier :** `server/models/RoadtripTask.js`
-
-Modèle gérant les tâches de préparation du roadtrip.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `roadtripId` | ObjectId | ✅ | Référence vers le roadtrip |
-| `title` | String | ✅ | Titre de la tâche (max 200 caractères) |
-| `description` | String | ❌ | Description détaillée (max 1000 caractères) |
-| `category` | String | ❌ | Catégorie de tâche |
-| `priority` | String | ❌ | Priorité ('low', 'medium', 'high', 'urgent') |
-| `status` | String | ❌ | Statut ('pending', 'in_progress', 'completed', 'cancelled') |
-| `dueDate` | Date | ❌ | Date d'échéance |
-| `completedAt` | Date | ❌ | Date de completion |
-| `assignedTo` | String | ❌ | Personne responsable |
-| `estimatedDuration` | Number | ❌ | Durée estimée (minutes) |
-| `reminderDate` | Date | ❌ | Date de rappel |
-| `attachments` | [ObjectId] | ❌ | Fichiers joints |
-| `notes` | String | ❌ | Notes additionnelles (max 2000 caractères) |
-| `order` | Number | ❌ | Ordre d'affichage |
-| `isRecurring` | Boolean | ❌ | Tâche récurrente |
-| `recurringPattern` | String | ❌ | Motif de récurrence ('daily', 'weekly', 'monthly') |
-
-**Catégories disponibles :**
-- `preparation`: Préparation du voyage
-- `booking`: Réservations
-- `packing`: Bagages
-- `documents`: Documents/papiers
-- `transport`: Transport
-- `accommodation`: Hébergement
-- `activities`: Activités
-- `health`: Santé/médicaments
-- `finances`: Finances
-- `communication`: Communication
-- `other`: Autre
-
----
-
-## Modèles de Jobs/Traitement Asynchrone
-
-### AIRoadtripJob
-**Fichier :** `server/models/AIRoadtripJob.js`
-
-Modèle gérant les jobs de génération automatique de roadtrips par IA.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `status` | String | ❌ | Statut du job |
-| `currentStep` | Number | ❌ | Étape actuelle |
-| `totalSteps` | Number | ❌ | Nombre total d'étapes |
-| `progress` | Object | ❌ | Informations de progression |
-| `parameters` | Object | ❌ | Paramètres de génération |
-| `startedAt` | Date | ❌ | Date de début |
-| `completedAt` | Date | ❌ | Date de fin |
-| `errorMessage` | String | ❌ | Message d'erreur |
-| `planData` | Object | ❌ | Plan intermédiaire |
-| `results` | Object | ❌ | Résultats finaux |
-| `aiApiCalls` | Array | ❌ | Log des appels IA |
-| `notifications` | Object | ❌ | État des notifications |
-
-**Statuts possibles :**
-- `pending`: En attente
-- `planning`: Planification
-- `detailing`: Détaillage
-- `creating`: Création
-- `completed`: Terminé
-- `failed`: Échec
-
----
-
-### ChatbotJob
-**Fichier :** `server/models/ChatbotJob.js`
-
-Modèle gérant les jobs de traitement des requêtes chatbot.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `roadtripId` | ObjectId | ✅ | Référence vers le roadtrip |
-| `conversationId` | String | ✅ | ID de conversation |
-| `userQuery` | String | ✅ | Requête utilisateur |
-| `intent` | String | ✅ | Intention détectée |
-| `entities` | Mixed | ❌ | Entités extraites |
-| `status` | String | ❌ | Statut du job |
-| `progress` | Object | ❌ | Progression détaillée |
-| `result` | Object | ❌ | Résultat du traitement |
-| `aiModel` | String | ❌ | Modèle IA utilisé |
-| `tokensUsed` | Number | ❌ | Tokens consommés |
-| `executionTime` | Number | ❌ | Temps d'exécution (ms) |
-
-**Intentions supportées :**
-- `add_step`: Ajouter une étape
-- `delete_step`: Supprimer une étape
-- `add_accommodation`: Ajouter un hébergement
-- `add_activity`: Ajouter une activité
-- Etc.
-
----
-
-### StepSyncJob
-**Fichier :** `server/models/StepSyncJob.js`
-
-Modèle gérant la synchronisation des dates entre étapes.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `roadtripId` | ObjectId | ✅ | Référence vers le roadtrip |
-| `status` | String | ❌ | Statut ('pending', 'running', 'completed', 'failed') |
-| `progress` | Object | ❌ | Progression du traitement |
-| `startedAt` | Date | ❌ | Date de début |
-| `completedAt` | Date | ❌ | Date de fin |
-| `errorMessage` | String | ❌ | Message d'erreur |
-| `results` | Object | ❌ | Résultats détaillés |
-
-**Résultats inclus :**
-- Nombre d'étapes traitées et synchronisées
-- Détails des changements par étape
-- Rapport de cohérence temporelle
-
----
-
-### TravelTimeJob
-**Fichier :** `server/models/TravelTimeJob.js`
-
-Modèle gérant le calcul des temps de trajet entre étapes.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `roadtripId` | ObjectId | ✅ | Référence vers le roadtrip |
-| `status` | String | ❌ | Statut du job |
-| `progress` | Object | ❌ | Progression du calcul |
-| `startedAt` | Date | ❌ | Date de début |
-| `completedAt` | Date | ❌ | Date de fin |
-| `errorMessage` | String | ❌ | Message d'erreur |
-| `results` | Object | ❌ | Résultats du calcul |
-
-**Résultats inclus :**
-- Distance totale du roadtrip
-- Temps de trajet total
-- Nombre d'étapes avec incohérences temporelles
-
----
-
-### TaskGenerationJob
-**Fichier :** `server/models/TaskGenerationJob.js`
-
-Modèle gérant la génération automatique de tâches.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `roadtripId` | ObjectId | ✅ | Référence vers le roadtrip |
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `status` | String | ❌ | Statut ('pending', 'processing', 'completed', 'failed') |
-| `result` | Object | ❌ | Résultat de génération |
-| `options` | Object | ❌ | Options de génération |
-| `createdAt` | Date | ❌ | Date de création |
-| `completedAt` | Date | ❌ | Date de completion |
-
----
-
-### StepStoryJob
-**Fichier :** `server/models/StepStoryJob.js`
-
-Modèle gérant la génération de récits pour les étapes.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `stepId` | ObjectId | ✅ | Référence vers l'étape |
-| `status` | String | ❌ | Statut ('pending', 'processing', 'done', 'error') |
-| `result` | Mixed | ❌ | Résultat de génération |
-| `error` | String | ❌ | Message d'erreur |
-| `createdAt` | Date | ❌ | Date de création |
-| `updatedAt` | Date | ❌ | Date de mise à jour |
-
----
-
-### AITaskJob
-**Fichier :** `server/models/AITaskJob.js`
-
-Modèle gérant la génération de tâches par IA.
-
-| Champ | Type | Requis | Description |
-|-------|------|--------|-------------|
-| `userId` | ObjectId | ✅ | Référence vers l'utilisateur |
-| `roadtripId` | ObjectId | ✅ | Référence vers le roadtrip |
-| `status` | String | ❌ | Statut du job |
-| `progress` | Number | ❌ | Progression (0-100) |
-| `currentStep` | String | ❌ | Étape actuelle |
-| `result` | Object | ❌ | Résultats |
-| `error` | Object | ❌ | Informations d'erreur |
-| `parameters` | Object | ❌ | Paramètres de génération |
-| `startedAt` | Date | ❌ | Date de début |
-| `completedAt` | Date | ❌ | Date de fin |
-| `estimatedDuration` | Number | ❌ | Durée estimée (secondes) |
-
-**Méthodes :**
-- `updateProgress(progress, currentStep)`: Mettre à jour la progression
-- `markCompleted(tasks)`: Marquer comme terminé
-- `markFailed(error)`: Marquer comme échoué
-
----
-
-## Modèles Dépréciés
-
-### Stage (Déprécié)
-**Fichier :** `server/models/Stage.js`
-
-⚠️ **Déprécié** - Remplacé par le modèle `Step` unifié.
-
-Ancien modèle représentant une étape longue avec hébergements et activités.
-
-### Stop (Déprécié)
-**Fichier :** `server/models/Stop.js`
-
-⚠️ **Déprécié** - Remplacé par le modèle `Step` unifié.
-
-Ancien modèle représentant un arrêt court sans hébergement.
-
----
-
-## Relations entre Modèles
-
-```
-User
-├── Roadtrip (1:n)
-│   ├── Step (1:n)
-│   │   ├── Activity (1:n)
-│   │   ├── Accommodation (1:n)
-│   │   └── File (1:n)
-│   ├── RoadtripTask (1:n)
-│   └── File (1:n)
-├── ChatHistory (1:n)
-├── Notification (1:n)
-└── UserSetting (1:1)
-
-Jobs (Traitement Asynchrone)
-├── AIRoadtripJob
-├── ChatbotJob
-├── StepSyncJob
-├── TravelTimeJob
-├── TaskGenerationJob
-├── StepStoryJob
-└── AITaskJob
-```
-
-## Index et Performances
-
-La plupart des modèles incluent des index MongoDB pour optimiser les performances :
-
-- **User** : `email`, `username`
-- **Roadtrip** : `userId`
-- **Step** : `userId`, `roadtripId`
-- **Activity/Accommodation** : `userId`, `stepId`
-- **ChatHistory** : `roadtripId + userId`, `conversationId`
-- **Notification** : `userId + createdAt`, `roadtripId + userId`
-- **Jobs** : `userId + roadtripId`, `status`, `createdAt`
-
-## Conventions de Nommage
-
-- **Collections** : Nom du modèle au singulier (MongoDB pluralise automatiquement)
-- **Champs ObjectId** : Suffixe `Id` (ex: `userId`, `roadtripId`)
-- **Champs booléens** : Préfixe `is` ou `has` (ex: `isActive`, `hasPhotos`)
-- **Champs de date** : Suffixe `At` ou `DateTime` (ex: `createdAt`, `startDateTime`)
-- **Énumérations** : Valeurs en snake_case pour les statuts, camelCase pour les autres
-
-## Validation et Contraintes
-
-- **Validation Mongoose** : Contraintes de type, requis, énumérations
-- **Validation métier** : Contraintes cross-champs (ex: activités seulement pour Stage)
-- **Index d'unicité** : `email`, `username`, `userId` pour UserSetting
-- **TTL** : Expiration automatique des notifications après 7 jours
-
-Cette documentation sera mise à jour au fur et à mesure de l'évolution de l'application.
-
-## 📊 Mapping Critique API → WatermelonDB
-
-| **API MongoDB** | **WatermelonDB Local** | **Conversion** |
-|-----------------|------------------------|----------------|
-| `arrivalDateTime` (ISO string) | `arrival_date_time` (number) | `new Date(api).getTime()` |
-| `departureDateTime` (ISO string) | `departure_date_time` (number) | `new Date(api).getTime()` |
-| `travelTimePreviousStep` (number) | `travel_time_previous_step` (number) | Direct |
-| `distancePreviousStep` (number) | `distance_previous_step` (number) | Direct |
-| `travelTimeNote` (string) | `travel_time_note` (string) | Direct |
-| `activities` (Array<ObjectId>) | `activities` (JSON string) | `JSON.stringify(activities)` |
-| `accommodations` (Array<ObjectId>) | `accommodations` (JSON string) | `JSON.stringify(accommodations)` |
-| `thumbnail` (File Object) | `thumbnail` (JSON string) | `JSON.stringify(thumbnailObject)` |
-| `photos` (Array<ObjectId>) | `photos` (JSON string) | `JSON.stringify(photos)` |
-| `documents` (Array<ObjectId>) | `documents` (JSON string) | `JSON.stringify(documents)` |
-
-## 🔄 Relations et Structures Complexes
-
-### **API Response - Step avec données jointes**
-```typescript
-// Quand l'API retourne un Step avec populate()
-{
-  _id: "673abc123...",
-  type: "Stage",
-  name: "Étape 1",
-  // ... autres champs step
-  
-  // Relations populées (objets complets, pas ObjectIds)
-  thumbnail: {
-    _id: "673def456...",
-    fileId: "uuid-123",
-    url: "https://storage.../thumb.jpg",
-    type: "thumbnail"
-  },
-  
-  activities: [
-    {
-      _id: "673ghi789...",
-      type: "hiking",
-      name: "Randonnée Mont Blanc",
-      // ... autres champs activity
-    }
-  ],
-  
-  accommodations: [
-    {
-      _id: "673jkl012...",
-      name: "Hôtel du Lac",
-      // ... autres champs accommodation
-    }
-  ]
-}
-```
-
-### **Stockage WatermelonDB correspondant**
-```typescript
-// Dans la table steps
-{
-  id: "673abc123...",
-  type: "Stage",
-  name: "Étape 1",
-  // ... autres champs convertis
-  
-  // Relations sérialisées en JSON
-  thumbnail: '{"_id":"673def456...","url":"https://...","type":"thumbnail"}',
-  activities: '[{"_id":"673ghi789...","type":"hiking","name":"Randonnée Mont Blanc"}]',
-  accommodations: '[{"_id":"673jkl012...","name":"Hôtel du Lac"}]'
-}
-```
-
-## ⚠️ Validations Métier Critiques
-
-### Step Type Rules
-- **Stage** = peut avoir `accommodations` + `activities`
-- **Stop** = JAMAIS d'`accommodations`/`activities`
-
-### Thumbnail Structure (toujours objet complet)
-```typescript
-{
-  _id: "673abc123...",
-  fileId: "uuid-string", 
-  url: "https://storage.../image.jpg",
-  type: "thumbnail",
-  createdAt: "2024-01-01T00:00:00.000Z"
-}
-```
-
-## 🚨 Erreurs Communes à Éviter
-
-1. **Types API vs Local** : `Stage/Stop` (API) ≠ `StepType` (local)
-2. **Dates** : API renvoie ISO strings, pas timestamps
-3. **Thumbnails** : Objets complets, pas strings d'URL
-4. **Arrays** : Sérialisation JSON obligatoire en WatermelonDB
-5. **Relations** : ObjectIds en MongoDB, pas d'objets imbriqués
-
-## 🔧 Patterns WatermelonDB Obligatoires
-
-### Création avec closure fix
-```typescript
-await database.write(async () => {
-  // Préparer TOUTES les données AVANT la closure
-  const rawData = {
-    name: apiStep.name,
-    type: apiStep.type,
-    thumbnail: JSON.stringify(apiStep.thumbnail),
-    activities: JSON.stringify(apiStep.activities || [])
-  };
-  
-  await stepsCollection.create((step: StepModel) => {
-    step._setRaw('name', rawData.name);
-    step._setRaw('type', rawData.type);
-    step._setRaw('thumbnail', rawData.thumbnail);
-    step._setRaw('activities', rawData.activities);
-  });
+// ✅ CORRECT - Préserver l'ObjectId MongoDB
+await stepsCollection.create((step: StepModel) => {
+  // CRITIQUE: Utiliser l'ObjectId MongoDB comme ID primaire WatermelonDB
+  step._setRaw('id', apiStep._id);  // apiStep._id = "673abc123def456789012345"
+  step._setRaw('name', apiStep.name);
+  // ...autres champs
+});
+
+// ❌ INCORRECT - Laisser WatermelonDB générer l'ID
+await stepsCollection.create((step: StepModel) => {
+  // step.id sera auto-généré comme "9KTT5LUsozsPVPeV" → Erreur API
+  step._setRaw('name', apiStep.name);
 });
 ```
 
-### Désérialisation sécurisée
+##### 2. Validation des IDs Avant Appels API
 ```typescript
-// Dans toInterface()
-get activities() {
-  try {
-    return JSON.parse(this.activitiesJson || '[]');
-  } catch {
-    return [];
-  }
+// ✅ CORRECT - Vérifier le format ObjectId avant appel API
+const isValidObjectId = (id: string): boolean => {
+  return /^[0-9a-fA-F]{24}$/.test(id);
+};
+
+// Avant navigation ou appel API
+if (!isValidObjectId(stepId)) {
+  console.error('❌ ID invalide pour API MongoDB:', stepId);
+  return; // ou gérer l'erreur
 }
 ```
 
----
-📖 **Documentation complète** : `Refonte/DOCUMENTATION_MODELES.md`
+##### 3. Debug Systématique des IDs
+```typescript
+// ✅ TOUJOURS logger les IDs pour validation
+console.log('🔍 ID Debug:', {
+  stepId,
+  length: stepId?.length,
+  isValidObjectId: /^[0-9a-fA-F]{24}$/.test(stepId),
+  type: typeof stepId
+});
+```
+
+##### 4. Pattern de Synchronisation Obligatoire
+```typescript
+// ✅ CORRECT - Pattern complet de synchronisation avec préservation ID
+await database.write(async () => {
+  const collection = database.get<ModelType>('table_name');
+  
+  // Supprimer les données existantes
+  const existing = await collection.query().fetch();
+  for (const item of existing) {
+    await item.markAsDeleted();
+  }
+  
+  // Recréer avec ObjectIds MongoDB préservés
+  for (const apiItem of apiItems) {
+    await collection.create((model: ModelType) => {
+      // CRITIQUE: Première ligne = préserver l'ObjectId MongoDB
+      model._setRaw('id', apiItem._id);
+      model._setRaw('field1', apiItem.field1);
+      // ...autres champs
+    });
+  }
+});
+```
+
+##### 5. Erreurs à Surveiller et Solutions
+
+**Erreur Type**: `Cast to ObjectId failed for value "9KTT5LUsozsPVPeV"`
+```typescript
+// ✅ SOLUTION: Vérifier le hook/service de synchronisation
+// 1. S'assurer que step._setRaw('id', apiStep._id) est présent
+// 2. Redémarrer avec --clear pour vider la base WatermelonDB
+// 3. Valider que les nouveaux ObjectIds sont préservés
+```
+
+**Erreur Type**: Navigation échoue avec stepId court
+```typescript
+// ✅ SOLUTION: Validation avant navigation
+const handleStepPress = (step: Step) => {
+  if (!isValidObjectId(step._id)) {
+    console.error('❌ Step avec ID invalide détecté:', step._id);
+    // Forcer une resynchronisation
+    refreshSteps(true);
+    return;
+  }
+  navigation.navigate('StepDetail', { stepId: step._id });
+};
+```
+
+##### 6. Tests de Régression Obligatoires
+
+Après toute modification de synchronisation, vérifier :
+```typescript
+// ✅ Checklist obligatoire
+// 1. Les IDs en base locale sont des ObjectIds MongoDB (24 chars)
+// 2. La navigation step details fonctionne sans erreur 500
+// 3. Les appels API utilisent les vrais ObjectIds MongoDB
+// 4. Aucun ID court WatermelonDB ne circule vers l'API
+```
+
+##### 7. Migration de Fix d'IDs
+```typescript
+// ✅ Si base corrompue avec IDs courts, migration obligatoire
+const fixCorruptedIds = async () => {
+  // Option 1: Reset complet (recommandé)
+  await database.write(async () => {
+    await database.unsafeResetDatabase();
+  });
+  
+  // Option 2: Resynchronisation forcée
+  await refreshSteps(true); // Force sync depuis API
+};
+```
+
+#### Règles de Prevention
+
+1. **JAMAIS** créer un modèle WatermelonDB sans `_setRaw('id', apiId)`
+2. **TOUJOURS** valider les IDs avant appels API
+3. **SYSTÉMATIQUEMENT** tester la navigation après modifications de sync
+4. **OBLIGATOIREMENT** redémarrer avec `--clear` après fix d'IDs
+5. **IMMÉDIATEMENT** corriger si des IDs courts sont détectés en logs
+
+#### Pattern de Résolution d'Urgence
+```bash
+# En cas d'erreur "Cast to ObjectId failed"
+# 1. Identifier la source (hook de sync)
+# 2. Ajouter step._setRaw('id', apiStep._id)
+# 3. Reset base locale
+npx expo start --clear
+# 4. Valider que nouveaux IDs sont corrects
+```
+
+## Patterns Spécifiques de Hooks de Synchronisation
+
+### Hook useSteps - Pattern de Référence
+```typescript
+// ✅ PATTERN CORRECT - Synchronisation avec préservation ObjectId
+const refreshSteps = useCallback(async (forceSync: boolean = false) => {
+  // ... logique de sync ...
+  
+  await database.write(async () => {
+    const stepsCollection = database.get<StepModel>('steps');
+    
+    // Supprimer données existantes
+    const existingSteps = await stepsCollection
+      .query(Q.where('roadtrip_id', roadtripId))
+      .fetch();
+    for (const step of existingSteps) {
+      await step.markAsDeleted();
+    }
+    
+    // Recréer avec ObjectIds préservés
+    for (const apiStep of apiSteps) {
+      // Préparer TOUTES les données AVANT la closure
+      const rawData = {
+        user_id: apiStep.userId || 'unknown',
+        roadtrip_id: apiStep.roadtripId || roadtripId,
+        // ... tous les autres champs
+      };
+      
+      await stepsCollection.create((step: StepModel) => {
+        // PREMIÈRE LIGNE = préserver ObjectId MongoDB
+        step._setRaw('id', apiStep._id);
+        step._setRaw('user_id', rawData.user_id);
+        // ... tous les autres champs avec _setRaw()
+      });
+    }
+  });
+}, [roadtripId]);
+```
+
+### Règles de Pattern pour tous les Hooks de Sync
+
+#### 1. Stratégie Offline-First Obligatoire
+```typescript
+// ✅ CORRECT - Cache-first puis sync conditionnelle
+useEffect(() => {
+  const initialize = async () => {
+    // 1. TOUJOURS charger d'abord les données locales
+    await loadLocalData();
+    
+    // 2. Vérifier si sync nécessaire
+    const shouldSync = await shouldSynchronize();
+    if (shouldSync) {
+      refresh(false); // Sync en arrière-plan
+    }
+  };
+  initialize();
+}, [id]);
+
+// ❌ INCORRECT - API-first
+useEffect(() => {
+  refresh(); // Bloque l'UI, pas offline-first
+}, [id]);
+```
+
+#### 2. Préparation des Données Avant Closure
+```typescript
+// ✅ CORRECT - Toutes les données préparées avant database.write()
+const syncData = async (apiItems) => {
+  // Préparer TOUTES les données en dehors de la closure
+  const preparedData = apiItems.map(item => ({
+    id: item._id, // ObjectId MongoDB
+    field1: item.field1 || 'default',
+    complexField: JSON.stringify(item.complexField || {}),
+    timestamp: Date.now()
+  }));
+  
+  await database.write(async () => {
+    for (const data of preparedData) {
+      await collection.create((model) => {
+        // Utiliser seulement les données préparées
+        model._setRaw('id', data.id);
+        model._setRaw('field1', data.field1);
+        // ... etc
+      });
+    }
+  });
+};
+
+// ❌ INCORRECT - Traitement dans la closure
+await database.write(async () => {
+  for (const apiItem of apiItems) {
+    // ❌ Traitement/sérialisation dans la closure
+    const processed = processApiItem(apiItem);
+    await collection.create((model) => {
+      model._setRaw('field', processed);
+    });
+  }
+});
+```
+
+#### 3. Validation des IDs Systématique
+```typescript
+// ✅ CORRECT - Validation avant utilisation
+const navigateToDetail = (item) => {
+  // Validation ObjectId avant navigation
+  if (!isValidObjectId(item._id)) {
+    console.error('❌ ID invalide détecté:', item._id);
+    // Option 1: Forcer resync
+    refresh(true);
+    return;
+    // Option 2: Afficher erreur à l'utilisateur
+  }
+  
+  navigation.navigate('Detail', { itemId: item._id });
+};
+
+const isValidObjectId = (id: string): boolean => {
+  return id && /^[0-9a-fA-F]{24}$/.test(id);
+};
+```
+
+#### 4. Gestion d'Erreurs Robuste
+```typescript
+// ✅ CORRECT - Fallback sur cache en cas d'erreur API
+const refresh = async (forceSync = false) => {
+  try {
+    const apiData = await fetchFromAPI();
+    setData(apiData);
+    await saveToLocal(apiData);
+  } catch (err) {
+    console.error('Erreur API:', err);
+    
+    // Fallback sur données locales
+    if (err.status !== 404) { // 404 = normal si pas de données
+      await loadLocalData();
+    }
+    
+    setError('Données en mode hors ligne');
+  }
+};
+```
+
+#### 5. Debug et Logging Standardisés
+```typescript
+// ✅ CORRECT - Logging structuré pour debug
+const debugSync = (phase: string, data: any) => {
+  console.log(`🔧 ${hookName} - ${phase}:`, {
+    itemCount: Array.isArray(data) ? data.length : 'N/A',
+    sampleId: data?.[0]?._id || data?._id,
+    idLength: data?.[0]?._id?.length || data?._id?.length,
+    timestamp: new Date().toISOString()
+  });
+};
+
+// Usage
+debugSync('API Response', apiData);
+debugSync('Local Save', preparedData);
+debugSync('UI Update', convertedData);
+```
+
+### Checklist Post-Développement Hook de Sync
+
+Avant de commiter tout hook de synchronisation, vérifier :
+
+1. ✅ **ObjectId préservé** : `step._setRaw('id', apiItem._id)` en première ligne
+2. ✅ **Données préparées** : Toute sérialisation/traitement avant `database.write()`
+3. ✅ **Validation ID** : `isValidObjectId()` avant navigation/API calls
+4. ✅ **Offline-first** : `loadLocal()` puis `shouldSync()` dans useEffect
+5. ✅ **Fallback robuste** : Cache local en cas d'erreur API
+6. ✅ **Debug logs** : Structure de données logguée pour troubleshooting
+7. ✅ **Test navigation** : Vérifier que détails s'ouvrent sans erreur 500
+8. ✅ **Test --clear** : App fonctionne après reset de base locale
