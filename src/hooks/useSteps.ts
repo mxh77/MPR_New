@@ -250,7 +250,7 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
 
       console.log('🌐 API - Étapes récupérées:', apiSteps.length);
       console.log('🌐 API - ✅ DONNÉES API UTILISÉES (synchronisation)');
-      console.log('🌐 API - Première étape (exemple):', apiSteps[0]);
+      console.log('🌐 API - Première étape (exemple):', apiSteps[0]._id);
 
       // Conversion directe des données API en Steps avec toutes les données
       const convertedSteps = apiSteps

@@ -62,6 +62,10 @@ const StepDetailScreen: React.FC = () => {
     refreshStepDetail 
   } = useStepDetail(stepId);
 
+  // Référence stable pour fetchStepDetail
+  const fetchStepDetailRef = useRef(fetchStepDetail);
+  fetchStepDetailRef.current = fetchStepDetail;
+
   // États pour les onglets
   const [tabIndex, setTabIndex] = useState(0);
   const [routes, setRoutes] = useState<TabRoute[]>([
@@ -69,13 +73,14 @@ const StepDetailScreen: React.FC = () => {
   ]);
 
   console.log('StepDetailScreen - stepId:', stepId, 'roadtripId:', roadtripId);
-  console.log('🔧 StepDetailScreen - États:', { 
-    hasStep: !!step, 
-    loading, 
-    syncing, 
-    error: !!error,
-    stepName: step?.name 
-  });
+  // Debug réduit pour éviter les re-renders excessifs
+  // console.log('🔧 StepDetailScreen - États:', { 
+  //   hasStep: !!step, 
+  //   loading, 
+  //   syncing, 
+  //   error: !!error,
+  //   stepName: step?.title 
+  // });
 
   /**
    * Fonction pour extraire l'URI de l'image depuis l'objet thumbnail
@@ -122,22 +127,22 @@ const StepDetailScreen: React.FC = () => {
     ];
 
     // Ajouter l'onglet Hébergements si c'est une étape Stage avec des accommodations
-    if (step.type === 'Stage' && step.accommodations?.length > 0) {
+    if (step.type === 'Stage' && (step as any).accommodations?.length > 0) {
       newRoutes.push({
         key: 'accommodations',
         title: 'Hébergements',
         icon: 'bed',
-        badge: step.accommodations.length
+        badge: (step as any).accommodations.length
       });
     }
 
     // Ajouter l'onglet Activités si il y en a
-    if (step.activities?.length > 0) {
+    if ((step as any).activities?.length > 0) {
       newRoutes.push({
         key: 'activities',
         title: 'Activités',
         icon: 'walk',
-        badge: step.activities.length
+        badge: (step as any).activities.length
       });
     }
 
@@ -146,15 +151,23 @@ const StepDetailScreen: React.FC = () => {
 
   /**
    * Chargement initial avec useFocusEffect pour rechargement au focus
+   * OPTIMISÉ: Utilise une référence stable pour éviter les re-renders
    */
   useFocusEffect(
     useCallback(() => {
       // Conditions strictes selon nos instructions Copilot anti-appels multiples
       if (!step && !loading && !syncing) {
         console.log('🔧 StepDetailScreen - useFocusEffect: Chargement initial des détails');
-        fetchStepDetail();
+        fetchStepDetailRef.current();
+      } else {
+        console.log('🔧 StepDetailScreen - useFocusEffect: Chargement ignoré', {
+          hasStep: !!step,
+          loading,
+          syncing,
+          reason: 'conditions non remplies'
+        });
       }
-    }, [step, loading, syncing, fetchStepDetail])
+    }, [step, loading, syncing]) // Dépendances stables uniquement
   );
 
   /**
@@ -170,7 +183,7 @@ const StepDetailScreen: React.FC = () => {
   const handleDelete = useCallback(() => {
     Alert.alert(
       'Supprimer l\'étape',
-      `Êtes-vous sûr de vouloir supprimer "${step?.name}" ?`,
+      `Êtes-vous sûr de vouloir supprimer "${step?.title}" ?`,
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -184,10 +197,8 @@ const StepDetailScreen: React.FC = () => {
     );
   }, [step]);
 
-  // Chargement initial
-  useEffect(() => {
-    fetchStepDetail();
-  }, [fetchStepDetail]);
+  // SUPPRIMÉ: useEffect double qui causait la boucle infinie
+  // Le useFocusEffect gère déjà le chargement initial
 
   // Mise à jour du loading state - supprimé car géré par le hook
 
@@ -209,7 +220,7 @@ const StepDetailScreen: React.FC = () => {
       {/* Image principale */}
       {(() => {
         const imageUri = getImageUri(step?.thumbnail);
-        console.log('🖼️ StepDetailScreen - URI calculée pour', step?.name, ':', imageUri);
+        console.log('🖼️ StepDetailScreen - URI calculée pour', step?.title);
         
         // Vérification de sécurité pour s'assurer que l'URI est bien une chaîne
         if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
@@ -218,7 +229,7 @@ const StepDetailScreen: React.FC = () => {
               source={{ uri: imageUri }}
               style={styles.mainImage}
               resizeMode="cover"
-              onLoad={() => console.log('🖼️ StepDetailScreen - Image chargée avec succès:', imageUri)}
+              onLoad={() => console.log('🖼️ StepDetailScreen - Image chargée avec succès:')}
               onError={(error) => {
                 console.warn('🖼️ StepDetailScreen - Erreur de chargement d\'image:', error.nativeEvent.error, 'pour URI:', imageUri);
               }}
@@ -239,20 +250,20 @@ const StepDetailScreen: React.FC = () => {
       {/* Informations principales */}
       <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.title, { color: theme.colors.text }]}>
-          {step?.name || 'Titre non défini'}
+          {step?.title || 'Titre non défini'}
         </Text>
         
-        {step?.address && (
+        {step?.location?.address && (
           <View style={styles.addressRow}>
             <Ionicons name="location" size={16} color={theme.colors.primary} />
             <Text style={[styles.address, { color: theme.colors.textSecondary }]}>
-              {step.address}
+              {step.location.address}
             </Text>
           </View>
         )}
 
         {/* Dates */}
-        {step?.arrivalDateTime && (
+        {step?.startDate && (
           <View style={styles.dateRow}>
             <Ionicons name="play-circle" size={16} color="#28a745" />
             <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>
@@ -260,14 +271,14 @@ const StepDetailScreen: React.FC = () => {
             </Text>
             <Text style={[styles.dateValue, { color: theme.colors.text }]}>
               {(() => {
-                const date = parseISODate(step.arrivalDateTime);
+                const date = step.startDate;
                 return date ? formatDateWithoutTimezone(date) : 'Date invalide';
               })()}
             </Text>
           </View>
         )}
 
-        {step?.departureDateTime && (
+        {step?.endDate && (
           <View style={styles.dateRow}>
             <Ionicons name="stop-circle" size={16} color="#dc3545" />
             <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>
@@ -275,7 +286,7 @@ const StepDetailScreen: React.FC = () => {
             </Text>
             <Text style={[styles.dateValue, { color: theme.colors.text }]}>
               {(() => {
-                const date = parseISODate(step.departureDateTime);
+                const date = step.endDate;
                 return date ? formatDateWithoutTimezone(date) : 'Date invalide';
               })()}
             </Text>
@@ -283,13 +294,13 @@ const StepDetailScreen: React.FC = () => {
         )}
 
         {/* Description */}
-        {step?.notes && (
+        {step?.description && (
           <View style={styles.descriptionSection}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
               Description
             </Text>
             <Text style={[styles.description, { color: theme.colors.text }]}>
-              {step.notes}
+              {step.description}
             </Text>
           </View>
         )}
@@ -324,7 +335,7 @@ const StepDetailScreen: React.FC = () => {
    * Rendu de l'onglet Hébergements
    */
   const renderAccommodationsTab = () => {
-    const accommodations = step?.accommodations || [];
+    const accommodations = (step as any)?.accommodations || [];
     
     return (
       <ScrollView style={styles.tabContent}>
@@ -369,7 +380,7 @@ const StepDetailScreen: React.FC = () => {
    * Rendu de l'onglet Activités
    */
   const renderActivitiesTab = () => {
-    const activities = step?.activities || [];
+    const activities = (step as any)?.activities || [];
     
     return (
       <ScrollView style={styles.tabContent}>
@@ -492,7 +503,7 @@ const StepDetailScreen: React.FC = () => {
         
         <View style={styles.headerTitle}>
           <Text style={[styles.headerTitleText, { color: theme.colors.white }]} numberOfLines={1}>
-            {step?.name || 'Détail de l\'étape'}
+            {step?.title || 'Détail de l\'étape'}
           </Text>
           <Text style={[styles.headerSubtitle, { color: theme.colors.white }]}>
             {step?.type === 'Stage' ? 'Étape' : 'Arrêt'}
@@ -535,7 +546,7 @@ const StepDetailScreen: React.FC = () => {
           </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: theme.colors.primary }]}
-            onPress={refreshStepDetail}
+            onPress={() => refreshStepDetail()}
           >
             <Text style={[styles.retryButtonText, { color: theme.colors.white }]}>
               Réessayer
