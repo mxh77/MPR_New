@@ -337,8 +337,10 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
                 // Note: sync_status et last_sync_at gérés par BaseModel
               };
 
-              // Création simple comme pour les roadtrips
+              // Création avec ObjectId MongoDB comme ID primaire
               await stepsCollection.create((step: StepModel) => {
+                // CRITIQUE: Utiliser l'ObjectId MongoDB comme ID primaire
+                step._setRaw('id', apiStep._id);
                 step._setRaw('user_id', rawData.user_id);
                 step._setRaw('roadtrip_id', rawData.roadtrip_id);
                 step._setRaw('type', rawData.type);

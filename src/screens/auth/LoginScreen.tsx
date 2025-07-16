@@ -103,7 +103,7 @@ export const LoginScreen: React.FC = () => {
         Alert.alert('Succès', 'Inscription réussie !');
       } else {
         await login(formData.email, formData.password);
-        Alert.alert('Succès', 'Connexion réussie !');
+        // Alert.alert('Succès', 'Connexion réussie !');
       }
     } catch (err) {
       console.error('Auth error:', err);
