@@ -194,10 +194,10 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
 
             console.log('🗄️ CACHE - Step récupéré du cache:', {
               title: stepInterface.title,
-              thumbnail: stepInterface.thumbnail ? 'présente' : 'absente',
-              thumbnailValue: stepInterface.thumbnail,
-              travelTimeNote: (stepInterface as any).travelTimeNote,
-              activitiesCount: (stepInterface as any).activities?.length || 0
+              // thumbnail: stepInterface.thumbnail ? 'présente' : 'absente',
+              // thumbnailValue: stepInterface.thumbnail,
+              // travelTimeNote: (stepInterface as any).travelTimeNote,
+              // activitiesCount: (stepInterface as any).activities?.length || 0
             });
             return stepInterface;
           } catch (err) {

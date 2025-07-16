@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../contexts';
+import { useTheme, useDatabase } from '../../contexts';
 import { useRoadtripsWithApi } from '../../hooks';
 import { RoadtripMenu } from '../../components/common/RoadtripMenu';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -239,6 +239,7 @@ const RoadtripCard: React.FC<RoadtripCardProps> = ({ item, onPress, onMenuPress,
 
 export const RoadtripsListScreenWithApi: React.FC = () => {
   const { theme } = useTheme();
+  const { database, isReady, error: dbError } = useDatabase();
   const navigation = useNavigation<RoadtripsListNavigationProp>();  const {
     roadtrips,
     loading,
@@ -290,6 +291,42 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
     
     await syncWithApi();
     Alert.alert('✅ Synchronisation', 'Synchronisation terminée');
+  };
+
+  // 🧪 FONCTION DE DEBUG TEMPORAIRE
+  const testDatabaseConnection = async () => {
+    console.log('🧪 Test de connexion à la base de données...');
+    
+    if (!isReady) {
+      Alert.alert('❌ Base non prête', `Statut: ${dbError || 'Initialisation en cours'}`);
+      return;
+    }
+
+    if (!database) {
+      Alert.alert('❌ Database null', 'Instance de base de données non disponible');
+      return;
+    }
+
+    try {
+      const roadtrips = await database.get('roadtrips').query().fetch();
+      const steps = await database.get('steps').query().fetch();
+      
+      Alert.alert(
+        '✅ Test réussi',
+        `Base fonctionnelle!\nRoadtrips: ${roadtrips.length}\nSteps: ${steps.length}`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      
+      console.log('✅ Test database réussi:', { roadtripsCount: roadtrips.length, stepsCount: steps.length });
+      
+    } catch (testError) {
+      console.error('❌ Erreur test database:', testError);
+      Alert.alert(
+        '❌ Erreur test',
+        `${testError instanceof Error ? testError.message : 'Erreur inconnue'}`,
+        [{ text: 'OK', style: 'destructive' }]
+      );
+    }
   };
 
   const handleRoadtripMenu = (roadtrip: any) => {

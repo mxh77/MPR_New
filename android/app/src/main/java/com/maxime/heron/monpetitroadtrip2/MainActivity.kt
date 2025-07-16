@@ -1,4 +1,4 @@
-package com.maxime.heron.monpetitroadtrip2.debug
+package com.maxime.heron.monpetitroadtrip2
 
 import android.os.Build
 import android.os.Bundle

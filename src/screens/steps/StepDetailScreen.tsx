@@ -70,7 +70,7 @@ const StepDetailScreen: React.FC = () => {
    * Fonction pour extraire l'URI de l'image depuis l'objet thumbnail
    */
   const getImageUri = (thumbnail: any): string | null => {
-    console.log('🖼️ StepDetailScreen - getImageUri - thumbnail reçu:');
+    // console.log('🖼️ StepDetailScreen - getImageUri - thumbnail reçu:');
     
     if (!thumbnail) {
       // console.log('🖼️ StepDetailScreen - getImageUri - thumbnail null/undefined');

@@ -143,13 +143,13 @@ const StepsListScreen: React.FC = () => {
     if (stepWithActivities.activities && stepWithActivities.activities.length > 0) {
       const activeActivity = stepWithActivities.activities.find((activity: any) => activity.active !== false);
       if (activeActivity && activeActivity.type) {
-        console.log('🎯 getStepMainActivityType - Activité trouvée:', activeActivity.type);
+        // console.log('🎯 getStepMainActivityType - Activité trouvée:', activeActivity.type);
         return activeActivity.type;
       }
     }
     
     // Par défaut, considérer comme une visite
-    console.log('🎯 getStepMainActivityType - Par défaut: Visite');
+    // console.log('🎯 getStepMainActivityType - Par défaut: Visite');
     return 'Visite';
   };
 
@@ -303,55 +303,55 @@ const StepsListScreen: React.FC = () => {
 
   // Fonction pour extraire l'URI de l'image (basée sur l'app existante)
   const getImageUri = (thumbnail: any): string | null => {
-    console.log('🖼️ getImageUri - thumbnail reçu:', typeof thumbnail);
+    // console.log('🖼️ getImageUri - thumbnail reçu:', typeof thumbnail);
     
     if (!thumbnail) {
-      console.log('🖼️ getImageUri - thumbnail null/undefined');
+      // console.log('🖼️ getImageUri - thumbnail null/undefined');
       return null;
     }
     
     // Si c'est déjà une chaîne
     if (typeof thumbnail === 'string') {
-      console.log('🖼️ getImageUri - string:', thumbnail);
+      // console.log('🖼️ getImageUri - string:', thumbnail);
       return thumbnail;
     }
     
     // Si c'est un objet avec une propriété url (structure API)
     if (typeof thumbnail === 'object' && thumbnail.url && typeof thumbnail.url === 'string') {
     //   console.log('🖼️ getImageUri - object.url:', thumbnail.url);
-      console.log('🖼️ getImageUri - object.url:');
+      // console.log('🖼️ getImageUri - object.url:');
       return thumbnail.url;
     }
     
     // Si c'est un objet avec une propriété uri
     if (typeof thumbnail === 'object' && thumbnail.uri && typeof thumbnail.uri === 'string') {
     //   console.log('🖼️ getImageUri - object.uri:', thumbnail.uri);
-      console.log('🖼️ getImageUri - object.uri:');
+      // console.log('🖼️ getImageUri - object.uri:');
       return thumbnail.uri;
     }
     
-    console.log('🖼️ getImageUri - Aucun format reconnu pour:', thumbnail);
+    // console.log('🖼️ getImageUri - Aucun format reconnu pour:', thumbnail);
     return null;
   };
 
   const renderTransportInfo = (currentStep: Step, nextStep?: Step) => {
     // Debug pour comprendre pourquoi les infos transport manquent entre les étapes
-    console.log('🚛 renderTransportInfo - Étape actuelle:', {
-      id: currentStep._id,
-      title: currentStep.title,
-      index: steps.findIndex(s => s._id === currentStep._id),
-      distance: currentStep.distance,
-      travelTimePreviousStep: (currentStep as any).travelTimePreviousStep,
-      distancePreviousStep: (currentStep as any).distancePreviousStep
-    });
+    // console.log('🚛 renderTransportInfo - Étape actuelle:', {
+    //   id: currentStep._id,
+    //   title: currentStep.title,
+    //   index: steps.findIndex(s => s._id === currentStep._id),
+    //   distance: currentStep.distance,
+    //   travelTimePreviousStep: (currentStep as any).travelTimePreviousStep,
+    //   distancePreviousStep: (currentStep as any).distancePreviousStep
+    // });
     
     if (nextStep) {
-      console.log('🚛 renderTransportInfo - Étape suivante:', {
-        id: nextStep._id,
-        title: nextStep.title,
-        travelTimePreviousStep: (nextStep as any).travelTimePreviousStep,
-        distancePreviousStep: (nextStep as any).distancePreviousStep
-      });
+      // console.log('🚛 renderTransportInfo - Étape suivante:', {
+      //   id: nextStep._id,
+      //   title: nextStep.title,
+      //   travelTimePreviousStep: (nextStep as any).travelTimePreviousStep,
+      //   distancePreviousStep: (nextStep as any).distancePreviousStep
+      // });
     }
 
     // La logique de l'app existante utilise travelTimePreviousStep et distancePreviousStep de l'étape SUIVANTE
@@ -519,7 +519,7 @@ const StepsListScreen: React.FC = () => {
           {(() => {
             const imageUri = getImageUri(item.thumbnail);
             // console.log('🖼️ renderStepItem - URI calculée pour', item.title, ':', imageUri);
-            console.log('🖼️ renderStepItem - URI calculée pour', item.title);
+            // console.log('🖼️ renderStepItem - URI calculée pour', item.title);
             
             // Vérification de sécurité supplémentaire pour s'assurer que l'URI est bien une chaîne
             if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
