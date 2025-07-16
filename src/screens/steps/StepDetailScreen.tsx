@@ -342,6 +342,30 @@ const StepDetailScreen: React.FC = () => {
         {accommodations.length > 0 ? (
           accommodations.map((accommodation: any, index: number) => (
             <View key={accommodation._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
+              {/* Thumbnail de l'hébergement */}
+              {(() => {
+                const imageUri = getImageUri(accommodation.thumbnail);
+                
+                if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
+                  return (
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.itemImage}
+                      resizeMode="cover"
+                      onError={(error) => {
+                        console.warn('🖼️ Erreur chargement image hébergement:', error.nativeEvent.error);
+                      }}
+                    />
+                  );
+                } else {
+                  return (
+                    <View style={[styles.itemImage, styles.placeholderImage]}>
+                      <Ionicons name="bed-outline" size={32} color={theme.colors.textSecondary} />
+                    </View>
+                  );
+                }
+              })()}
+              
               <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
                 {accommodation.name || `Hébergement ${index + 1}`}
               </Text>
@@ -349,6 +373,29 @@ const StepDetailScreen: React.FC = () => {
                 <Text style={[styles.itemAddress, { color: theme.colors.textSecondary }]}>
                   {accommodation.address}
                 </Text>
+              )}
+              {/* Affichage des dates - alignement horizontal */}
+              {(accommodation.startDateTime || accommodation.arrivalDateTime || accommodation.endDateTime || accommodation.departureDateTime) && (
+                <View style={styles.dateContainer}>
+                  {(accommodation.startDateTime || accommodation.arrivalDateTime) && (
+                    <Text style={[styles.dateLeft, { color: theme.colors.textSecondary }]}>
+                      Début : {(() => {
+                        const dateString = accommodation.startDateTime || accommodation.arrivalDateTime;
+                        const date = parseISODate(dateString);
+                        return date ? formatDateWithoutTimezone(date) : 'N/A';
+                      })()}
+                    </Text>
+                  )}
+                  {(accommodation.endDateTime || accommodation.departureDateTime) && (
+                    <Text style={[styles.dateRight, { color: theme.colors.textSecondary }]}>
+                      Fin : {(() => {
+                        const dateString = accommodation.endDateTime || accommodation.departureDateTime;
+                        const date = parseISODate(dateString);
+                        return date ? formatDateWithoutTimezone(date) : 'N/A';
+                      })()}
+                    </Text>
+                  )}
+                </View>
               )}
               {accommodation.active !== undefined && (
                 <View style={styles.statusRow}>
@@ -399,6 +446,30 @@ const StepDetailScreen: React.FC = () => {
         })
         .map((activity: any, index: number) => (
           <View key={activity._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
+            {/* Thumbnail de l'activité */}
+            {(() => {
+              const imageUri = getImageUri(activity.thumbnail);
+              
+              if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
+                return (
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.itemImage}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      console.warn('🖼️ Erreur chargement image activité:', error.nativeEvent.error);
+                    }}
+                  />
+                );
+              } else {
+                return (
+                  <View style={[styles.itemImage, styles.placeholderImage]}>
+                    <Ionicons name="walk-outline" size={32} color={theme.colors.textSecondary} />
+                  </View>
+                );
+              }
+            })()}
+            
             <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
           {activity.name || `Activité ${index + 1}`}
             </Text>
@@ -412,13 +483,26 @@ const StepDetailScreen: React.FC = () => {
             {activity.address}
           </Text>
             )}
-            {activity.startDateTime && (
-          <Text style={[styles.itemAddress, { color: theme.colors.textSecondary }]}>
-            Début : {(() => {
-              const date = parseISODate(activity.startDateTime);
-              return date ? formatDateWithoutTimezone(date) : 'Date invalide';
-            })()}
-          </Text>
+            {/* Affichage des dates - alignement horizontal */}
+            {(activity.startDateTime || activity.endDateTime) && (
+              <View style={styles.dateContainer}>
+                {activity.startDateTime && (
+                  <Text style={[styles.dateLeft, { color: theme.colors.textSecondary }]}>
+                    Début : {(() => {
+                      const date = parseISODate(activity.startDateTime);
+                      return date ? formatDateWithoutTimezone(date) : 'N/A';
+                    })()}
+                  </Text>
+                )}
+                {activity.endDateTime && (
+                  <Text style={[styles.dateRight, { color: theme.colors.textSecondary }]}>
+                    Fin : {(() => {
+                      const date = parseISODate(activity.endDateTime);
+                      return date ? formatDateWithoutTimezone(date) : 'N/A';
+                    })()}
+                  </Text>
+                )}
+              </View>
             )}
             {activity.active !== undefined && (
           <View style={styles.statusRow}>
@@ -795,6 +879,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  itemImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 12,
+  },
   itemTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -808,6 +899,22 @@ const styles = StyleSheet.create({
   itemAddress: {
     fontSize: 14,
     marginBottom: 12,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  dateLeft: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'left',
+  },
+  dateRight: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'right',
   },
   statusRow: {
     flexDirection: 'row',

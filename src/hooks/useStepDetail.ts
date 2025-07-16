@@ -30,6 +30,13 @@ const isValidObjectId = (id: string): boolean => {
  * Convertit une ApiStep en Step avec toutes les données additionnelles
  */
 const convertApiStepToStep = (apiStep: ApiStep): Step => {
+  // Debug userId distant
+  console.log('🔍 convertApiStepToStep - userId distant:', {
+    userId: apiStep.userId,
+    stepId: apiStep._id,
+    stepName: apiStep.name
+  });
+
   const step = {
     _id: apiStep._id,
     roadtripId: apiStep.roadtripId,
@@ -74,6 +81,13 @@ const convertApiStepToStep = (apiStep: ApiStep): Step => {
  * Convertit un StepModel WatermelonDB en Step
  */
 const convertStepModelToStep = (stepModel: StepModel): Step => {
+  // Debug userId local
+  console.log('🔍 convertStepModelToStep - userId local:', {
+    userId: stepModel.userId,
+    stepId: stepModel.id,
+    stepName: stepModel.name
+  });
+
   // Parse des données JSON stockées
   let activities = [];
   let accommodations = [];
@@ -155,6 +169,14 @@ const convertStepModelToStep = (stepModel: StepModel): Step => {
  * Sauvegarde les détails d'une étape en local
  */
 const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
+  // Debug userId avant sauvegarde
+  console.log('💾 saveStepDetailToLocal - userId API:', {
+    userId: apiStep.userId,
+    stepId: apiStep._id,
+    stepName: apiStep.name,
+    roadtripId: apiStep.roadtripId
+  });
+
   await database.write(async () => {
     const stepsCollection = database.get<StepModel>('steps');
     
@@ -180,7 +202,7 @@ const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
         activities: JSON.stringify(apiStep.activities || []),
         accommodations: JSON.stringify(apiStep.accommodations || []),
         thumbnail: JSON.stringify(apiStep.thumbnail || null),
-        custom_sync_status: 'synced',
+        // custom_sync_status: 'synced',
         last_sync_at: Date.now(),
         created_at: Date.now(),
         updated_at: Date.now(),
@@ -217,7 +239,7 @@ const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
         activities: JSON.stringify(apiStep.activities || []),
         accommodations: JSON.stringify(apiStep.accommodations || []),
         thumbnail: JSON.stringify(apiStep.thumbnail || null),
-        custom_sync_status: 'synced',
+        // custom_sync_status: 'synced',
         last_sync_at: Date.now(),
         created_at: Date.now(),
         updated_at: Date.now(),
@@ -225,7 +247,7 @@ const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
 
       await stepsCollection.create((step: StepModel) => {
         // CRITIQUE: Préserver l'ObjectId MongoDB
-        step._setRaw('id', apiStep._id);
+        step._raw.id = String(apiStep._id);
         Object.keys(rawData).forEach(key => {
           step._setRaw(key, (rawData as any)[key]);
         });
@@ -241,6 +263,14 @@ const loadStepDetailFromLocal = async (stepId: string): Promise<Step | null> => 
   try {
     const stepsCollection = database.get<StepModel>('steps');
     const stepModel = await stepsCollection.find(stepId);
+    
+    // Debug userId récupéré du local
+    console.log('📱 loadStepDetailFromLocal - userId local récupéré:', {
+      userId: stepModel.userId,
+      stepId: stepModel.id,
+      stepName: stepModel.name
+    });
+    
     return convertStepModelToStep(stepModel);
   } catch (error) {
     console.log('📱 useStepDetail - Étape non trouvée en local:', stepId);
@@ -339,6 +369,8 @@ export const useStepDetail = (stepId: string): UseStepDetailResult => {
         console.log('📡 useStepDetail - Réponse API reçue:', {
           name: apiStep.name,
           type: apiStep.type,
+          userId: apiStep.userId,
+          roadtripId: apiStep.roadtripId,
           activitiesCount: apiStep.activities?.length || 0,
           accommodationsCount: apiStep.accommodations?.length || 0
         });
@@ -405,6 +437,14 @@ export const useStepDetail = (stepId: string): UseStepDetailResult => {
           // Appel API
           const apiStep = await getStepById(stepId);
           
+          console.log('📡 useStepDetail - Réponse API reçue (refresh):', {
+            name: apiStep.name,
+            type: apiStep.type,
+            userId: apiStep.userId,
+            roadtripId: apiStep.roadtripId,
+            activitiesCount: apiStep.activities?.length || 0,
+            accommodationsCount: apiStep.accommodations?.length || 0
+          });
           // Sauvegarder en local
           await saveStepDetailToLocal(apiStep);
 
