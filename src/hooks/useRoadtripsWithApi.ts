@@ -273,7 +273,7 @@ export const useRoadtripsWithApi = () => {
   }, [isOnline, user, syncing, database, resolveIdConflicts, fetchLocalRoadtrips]);
 
   /**
-   * Charger les roadtrips (local + sync si online et nécessaire)
+   * Charger les roadtrips (local + sync si online et nécessaire) - Version optimisée
    */
   const fetchRoadtrips = useCallback(async (forceSync: boolean = false) => {
     if (!isReady || !database || !user) return;
@@ -283,7 +283,32 @@ export const useRoadtripsWithApi = () => {
       setError(null);
 
       // Toujours charger le local en premier (offline-first)
-      await fetchLocalRoadtrips();
+      console.log('📍 Chargement des roadtrips locaux...');
+
+      const roadtripsCollection = database.get<Roadtrip>('roadtrips');
+      const roadtripRecords = await roadtripsCollection
+        .query(Q.where('user_id', user._id))
+        .fetch();
+
+      const roadtripsData = roadtripRecords.map(convertRecordToData);
+      setRoadtrips(roadtripsData);
+
+      console.log(`✅ ${roadtripsData.length} roadtrips locaux chargés`);
+      
+      // ✅ DEBUG: Détailler les roadtrips chargés
+      console.log('📊 === ROADTRIPS CHARGÉS DEPUIS LE CACHE ===');
+      if (roadtripsData.length === 0) {
+        console.log('   Aucun roadtrip trouvé dans le cache local');
+      } else {
+        roadtripsData.forEach((roadtrip, index) => {
+          console.log(`   [${index + 1}] ID: "${roadtrip.id}" | Titre: "${roadtrip.title}"`);
+          console.log(`        - SyncStatus: ${roadtrip.syncStatus}`);
+          console.log(`        - UserId: "${roadtrip.userId}" (longueur: ${roadtrip.userId?.length})`);
+          console.log(`        - User actuel: "${user._id}" | Match? ${roadtrip.userId === user._id ? '✅ OUI' : '❌ NON'}`);
+          console.log(`        - Dates: ${roadtrip.startDate.toLocaleDateString()} → ${roadtrip.endDate.toLocaleDateString()}`);
+        });
+      }
+      console.log('📊 === FIN ROADTRIPS CHARGÉS ===');
 
       // Vérifier si une synchronisation est nécessaire
       const collection = database.get<Roadtrip>('roadtrips');
@@ -297,8 +322,88 @@ export const useRoadtripsWithApi = () => {
 
       if (shouldSync) {
         console.log('🔄 Déclenchement sync API... (count local:', currentCount, ', forceSync:', forceSync, ')');
-        // Ne pas attendre la synchronisation pour éviter de bloquer l'UI
-        syncWithApi();
+        // Synchronisation en arrière-plan sans bloquer l'UI
+        setSyncing(true);
+        try {
+          console.log('🔄 Synchronisation avec l\'API...');
+
+          // Résoudre les conflits d'IDs avant de commencer la synchronisation
+          const hasConflicts = await resolveIdConflicts();
+          
+          // Si des conflits ont été résolus, recharger les données locales
+          if (hasConflicts) {
+            const updatedRecords = await roadtripsCollection
+              .query(Q.where('user_id', user._id))
+              .fetch();
+            const updatedData = updatedRecords.map(convertRecordToData);
+            setRoadtrips(updatedData);
+          }
+
+          // Récupérer les roadtrips depuis l'API
+          const apiResponse = await roadtripsApiService.getRoadtrips(1, 50);
+          const apiRoadtrips = apiResponse.roadtrips || [];
+
+          console.log(`📥 ${apiRoadtrips.length} roadtrips reçus de l'API`);
+
+          // Synchroniser avec la base locale
+          let hasChanges = false;
+          for (const apiRoadtrip of apiRoadtrips) {
+            try {
+              const mongoIdString = String(apiRoadtrip._id);
+              const existingRecord = await roadtripsCollection.find(mongoIdString).catch(() => null);
+
+              if (!existingRecord) {
+                console.log(`➕ Création nouveau roadtrip: ${apiRoadtrip.name}`);
+                await database.write(async () => {
+                  await roadtripsCollection.create(roadtrip => {
+                    roadtrip._raw.id = mongoIdString;
+                    roadtrip._setRaw('title', apiRoadtrip.name);
+                    roadtrip._setRaw('description', apiRoadtrip.notes || '');
+                    roadtrip._setRaw('start_date', new Date(apiRoadtrip.startDateTime).getTime());
+                    roadtrip._setRaw('end_date', new Date(apiRoadtrip.endDateTime).getTime());
+                    roadtrip._setRaw('start_location', apiRoadtrip.startLocation || '');
+                    roadtrip._setRaw('end_location', apiRoadtrip.endLocation || '');
+                    roadtrip._setRaw('currency', apiRoadtrip.currency || 'EUR');
+                    const userIdString = apiRoadtrip.userId ? String(apiRoadtrip.userId) : user._id;
+                    roadtrip._setRaw('user_id', userIdString);
+                    roadtrip._setRaw('is_public', false);
+                    roadtrip._setRaw('thumbnail', extractThumbnailUrl(apiRoadtrip.thumbnail) || '');
+                    roadtrip._setRaw('photos', JSON.stringify(apiRoadtrip.photos || []));
+                    roadtrip._setRaw('documents', JSON.stringify(apiRoadtrip.documents || []));
+                    roadtrip._setRaw('total_steps', apiRoadtrip.steps ? apiRoadtrip.steps.length : 0);
+                    roadtrip._setRaw('total_distance', 0);
+                    roadtrip._setRaw('estimated_duration', 0);
+                    roadtrip._setRaw('tags', JSON.stringify([]));
+                    roadtrip._setRaw('sync_status', 'synced');
+                    roadtrip._setRaw('last_sync_at', Date.now());
+                    roadtrip._setRaw('created_at', Date.now());
+                    roadtrip._setRaw('updated_at', Date.now());
+                  });
+                });
+                hasChanges = true;
+              }
+            } catch (itemError) {
+              console.error(`❌ Erreur sync roadtrip ${String(apiRoadtrip._id)}:`, itemError);
+            }
+          }
+
+          // Recharger seulement si des changements ont été faits
+          if (hasChanges) {
+            const finalRecords = await roadtripsCollection
+              .query(Q.where('user_id', user._id))
+              .fetch();
+            const finalData = finalRecords.map(convertRecordToData);
+            setRoadtrips(finalData);
+            console.log(`✅ Données locales mises à jour après synchronisation`);
+          } else {
+            console.log('📋 Aucun changement détecté, synchronisation terminée');
+          }
+
+        } catch (syncError) {
+          console.error('❌ Erreur synchronisation API:', syncError);
+        } finally {
+          setSyncing(false);
+        }
       } else {
         console.log('📱 Synchronisation ignorée:', {
           isOnline,
@@ -314,7 +419,7 @@ export const useRoadtripsWithApi = () => {
     } finally {
       setLoading(false);
     }
-  }, [isReady, database, user, isOnline, fetchLocalRoadtrips, syncing, syncWithApi]);
+  }, [isReady, database, user, isOnline, syncing]); // ✅ CORRECTION: Retirer fetchLocalRoadtrips et syncWithApi des dépendances
 
   /**
    * Créer un nouveau roadtrip (optimiste)
@@ -448,13 +553,14 @@ export const useRoadtripsWithApi = () => {
     }
   }, [isReady, database, isOnline]);
 
-  // Auto-load au montage seulement (version optimisée)
-  useEffect(() => {
-    if (isReady && database && user && roadtrips.length === 0 && !loading && !syncing) {
-      console.log('🚀 Chargement initial des roadtrips...');
-      fetchRoadtrips();
-    }
-  }, [isReady, database, user]);
+  // ✅ DÉSACTIVÉ: Auto-load au montage pour éviter les doubles appels
+  // Le useFocusEffect de l'écran gère déjà le chargement initial
+  // useEffect(() => {
+  //   if (isReady && database && user && roadtrips.length === 0 && !loading && !syncing) {
+  //     console.log('🚀 Chargement initial des roadtrips...');
+  //     fetchRoadtrips();
+  //   }
+  // }, [isReady, database, user]);
 
   // ✅ DÉSACTIVÉ: Resync automatique sur changement de statut réseau
   // pour éviter les synchronisations inutiles

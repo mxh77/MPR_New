@@ -261,16 +261,21 @@ export const RoadtripsListScreenWithApi: React.FC = () => {
   const [selectedRoadtrip, setSelectedRoadtrip] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Refresh à chaque focus de l'écran (charge initial + retour d'autres écrans)
+  // ✅ CORRECTION: Refresh optimisé pour éviter les appels en triple
   useFocusEffect(
     useCallback(() => {
-      // Toujours charger, mais sans forcer la sync si on a déjà des données
-      if (roadtrips.length === 0) {
-        fetchRoadtrips(); // Premier chargement avec sync
+      // Ne charger QUE si on n'a pas encore de données ET qu'on n'est pas déjà en train de charger
+      if (roadtrips.length === 0 && !loading && !syncing) {
+        console.log('🎯 useFocusEffect: Premier chargement uniquement');
+        fetchRoadtrips(); // Premier chargement avec sync si nécessaire
       } else {
-        fetchRoadtrips(false); // Juste reload local rapide
+        console.log('🎯 useFocusEffect: Chargement ignoré', {
+          hasData: roadtrips.length > 0,
+          loading,
+          syncing
+        });
       }
-    }, [fetchRoadtrips])
+    }, [roadtrips.length, loading, syncing, fetchRoadtrips])
   );
 
   const handleRefresh = useCallback(async () => {
