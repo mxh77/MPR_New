@@ -9,7 +9,8 @@
 4. [Règles de Développement](#règles-de-développement-strictes)
 5. [🆔 GESTION DES IDS CRITIQUES](#️-gestion-des-ids-mongodb--watermelondb---règles-critiques-️)
 6. [📊 MONGODB RÉFÉRENCE](#-schémas-mongodb---référence-obligatoire)
-7. [Patterns Spécifiques](#patterns-darchitecture-spécifiques)
+7. [⚡ OPTIMISATION PERFORMANCE](#️-optimisation-performance---règles-critiques-️)
+8. [Patterns Spécifiques](#patterns-darchitecture-spécifiques)
 
 ---
 
@@ -477,15 +478,178 @@ debugSync('Local Save', preparedData);
 debugSync('UI Update', convertedData);
 ```
 
-### Checklist Post-Développement Hook de Sync
+### 8. Patterns de Hooks de Synchronisation Anti-Appels Multiples
 
-Avant de commiter tout hook de synchronisation, vérifier :
+#### Hook Pattern de Référence (useRoadtripsWithApi)
+```typescript
+// ✅ PATTERN CORRECT - Un seul point d'entrée optimisé
+export const useDataWithApi = () => {
+  // ...existing code...
+  
+  // ❌ DÉSACTIVÉ: Auto-load pour éviter les doubles appels
+  // Le useFocusEffect de l'écran gère le chargement initial
+  // useEffect(() => {
+  //   if (isReady && database && user && data.length === 0 && !loading && !syncing) {
+  //     fetchData();
+  //   }
+  // }, [isReady, database, user]);
+  
+  // ✅ CORRECT: fetchData avec dépendances minimales
+  const fetchData = useCallback(async (forceSync = false) => {
+    if (!isReady || !database || !user) return;
+    
+    // Intégrer directement la logique au lieu de dépendre d'autres fonctions
+    const localData = await database.get('table').query().fetch();
+    setData(localData);
+    
+    // Sync conditionnelle intégrée
+    if (shouldSync && !syncing) {
+      setSyncing(true);
+      // ... logique de sync intégrée
+      setSyncing(false);
+    }
+  }, [isReady, database, user, syncing]); // Dépendances minimales
+};
+```
 
-1. ✅ **ObjectId préservé** : `step._setRaw('id', apiItem._id)` en première ligne
-2. ✅ **Données préparées** : Toute sérialisation/traitement avant `database.write()`
-3. ✅ **Validation ID** : `isValidObjectId()` avant navigation/API calls
-4. ✅ **Offline-first** : `loadLocal()` puis `shouldSync()` dans useEffect
-5. ✅ **Fallback robuste** : Cache local en cas d'erreur API
-6. ✅ **Debug logs** : Structure de données logguée pour troubleshooting
-7. ✅ **Test navigation** : Vérifier que détails s'ouvrent sans erreur 500
-8. ✅ **Test --clear** : App fonctionne après reset de base locale
+#### Pattern d'Écran Optimisé
+```typescript
+// ✅ PATTERN CORRECT - useFocusEffect avec conditions strictes
+export const DataListScreen = () => {
+  const { data, loading, syncing, fetchData } = useDataWithApi();
+  
+  useFocusEffect(
+    useCallback(() => {
+      // Conditions strictes pour éviter appels multiples
+      if (data.length === 0 && !loading && !syncing) {
+        console.log('🎯 useFocusEffect: Premier chargement uniquement');
+        fetchData();
+      } else {
+        console.log('🎯 useFocusEffect: Chargement ignoré', {
+          hasData: data.length > 0,
+          loading,
+          syncing,
+          reason: 'conditions non remplies'
+        });
+      }
+    }, [data.length, loading, syncing, fetchData])
+  );
+};
+```
+
+#### Anti-Patterns à Éviter ABSOLUMENT
+```typescript
+// ❌ INCORRECT - Double chargement
+const BadScreen = () => {
+  const { data, fetchData } = useDataWithApi(); // Hook a déjà un useEffect
+  
+  useFocusEffect(() => {
+    fetchData(); // Double appel garanti !
+  }, [fetchData]);
+};
+
+// ❌ INCORRECT - Dépendances qui changent constamment
+const fetchData = useCallback(async () => {
+  await fetchLocalData(); // Fonction qui change à chaque render
+  await syncWithApi();    // Fonction qui change à chaque render
+}, [fetchLocalData, syncWithApi]); // Nouvelles instances à chaque render
+
+// ❌ INCORRECT - Pas de conditions de protection
+useFocusEffect(() => {
+  fetchData(); // Se déclenche TOUJOURS, même si data déjà présente
+}, [fetchData]);
+```
+
+#### Checklist Debug Hooks de Sync
+1. ✅ **Un seul useEffect OU useFocusEffect** par type de chargement
+2. ✅ **Conditions strictes** : `data.length === 0 && !loading && !syncing`
+3. ✅ **Dépendances minimales** dans useCallback
+4. ✅ **Logique intégrée** plutôt que dépendances de fonctions
+5. ✅ **Logs de debug** avec identifiants uniques
+6. ✅ **Test manuel** : navigation multiple sans appels en double
+
+## ⚡ OPTIMISATION PERFORMANCE - RÈGLES CRITIQUES ⚡
+
+### 🚨 PRÉVENTION DES APPELS MULTIPLES - PRIORITÉ ABSOLUE
+
+#### Règles Anti-Duplication d'Appels API/Database
+- **JAMAIS** plus d'un `useEffect` ou `useFocusEffect` faisant le même appel dans un composant
+- **TOUJOURS vérifier** : si `useEffect` dans hook ET `useFocusEffect` dans écran → **DÉSACTIVER L'UN DES DEUX**
+- **PRIORITÉ** : `useFocusEffect` dans l'écran gère le chargement initial, désactiver `useEffect` du hook
+- **Conditions strictes** : `if (data.length === 0 && !loading && !syncing)` pour éviter appels en parallèle
+
+#### Optimisation useCallback/useMemo Obligatoire
+- **TOUJOURS** utiliser `useCallback` pour les fonctions passées en dépendances
+- **MINIMISER** les dépendances dans `useCallback` : retirer les fonctions internes si possible
+- **ÉVITER** `fetchLocalData` et `syncWithApi` dans les dépendances → intégrer directement dans la fonction
+- **PATTERN OPTIMAL** : 
+  ```typescript
+  const fetchData = useCallback(async () => {
+    // Intégrer directement la logique au lieu de dépendre d'autres fonctions
+    const localData = await database.get('table').query().fetch();
+    setData(localData);
+  }, [database]); // Dépendances minimales seulement
+  ```
+
+#### Debug et Monitoring des Performances
+- **TOUJOURS** ajouter des logs de debug avec identifiants uniques
+- **FORMAT STANDARD** : `🎯 [NomComposant] Action: détails`
+- **TRAÇABILITÉ** : Logger les conditions qui déclenchent ou bloquent les appels
+- **EXEMPLE** :
+  ```typescript
+  console.log('🎯 useFocusEffect: Chargement ignoré', {
+    hasData: data.length > 0,
+    loading,
+    syncing,
+    reason: 'conditions non remplies'
+  });
+  ```
+
+#### Patterns de Synchronisation Optimaux
+- **Cache-first TOUJOURS** : Charger local immédiatement, sync en arrière-plan si nécessaire
+- **Sync conditionnelle** : `shouldSync = isOnline && !syncing && (forceSync || localCount === 0)`
+- **Pas d'attente sur sync** : Synchronisation en arrière-plan pour ne pas bloquer l'UI
+- **État de loading séparé** : `loading` pour chargement initial, `syncing` pour synchronisation API
+
+#### Checklist Obligatoire Avant Commit
+1. ✅ **Un seul point d'entrée** pour le chargement des données par écran
+2. ✅ **Logs de debug** avec contexte complet pour traçabilité
+3. ✅ **Conditions strictes** dans useFocusEffect/useEffect
+4. ✅ **Dépendances minimales** dans useCallback
+5. ✅ **Test en dev + release** pour vérifier l'absence d'appels multiples
+6. ✅ **Cache offline-first** fonctionnel sans appels API inutiles
+
+### 1. Minimiser les Re-rendus Inutiles
+- Utiliser `React.memo` pour les composants fonctionnels lourds
+- Implémenter `shouldComponentUpdate` pour les composants de classe
+- Éviter les objets/arrays inline dans le rendu, préférer les constantes
+
+### 2. Utilisation Efficace du Contexte
+- Limiter la profondeur des consommateurs de contexte
+- Éviter de passer des valeurs d'objet complexes directement
+- Utiliser des sélecteurs pour ne re-rendre que les parties nécessaires
+
+### 3. Optimisation des Hooks Personnalisés
+- Éviter les calculs coûteux ou les appels API dans le corps du hook
+- Accepter des dépendances pour permettre une mémorisation efficace
+- Retourner des fonctions de nettoyage pour éviter les fuites de mémoire
+
+### 4. Chargement et Synchronisation des Données
+- Préférer les chargements en arrière-plan avec des indicateurs de chargement
+- Utiliser des requêtes agrégées pour réduire le nombre d'appels API
+- Implémenter une logique de pagination ou de chargement infini si nécessaire
+
+### 5. Gestion des Images et Médias
+- Utiliser des composants d'image optimisés (ex: `react-native-fast-image`)
+- Charger les images en fonction de la visibilité (lazy loading)
+- Éviter les redimensionnements d'images coûteux sur le fil d'Ariane
+
+### 6. Profiling et Analyse de Performance
+- Utiliser l'outil de profiling React pour identifier les goulets d'étranglement
+- Analyser les rapports de performance pour cibler les optimisations
+- Tester sur des appareils réels pour des résultats précis
+
+### 7. Bonnes Pratiques Générales
+- Garder le code propre et bien organisé pour faciliter les optimisations
+- Écrire des tests de performance pour détecter les régressions
+- Documenter les décisions d'optimisation pour la maintenance future
