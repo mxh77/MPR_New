@@ -27,6 +27,7 @@ import { getStepById } from '../../services/api/steps';
 import type { Step } from '../../types';
 import type { ApiStep } from '../../services/api/roadtrips';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
+import { formatDateWithoutTimezone, parseISODate } from '../../utils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -264,13 +265,10 @@ const StepDetailScreen: React.FC = () => {
               Arrivée:
             </Text>
             <Text style={[styles.dateValue, { color: theme.colors.text }]}>
-              {new Intl.DateTimeFormat('fr-FR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              }).format(new Date(step.arrivalDateTime))}
+              {(() => {
+                const date = parseISODate(step.arrivalDateTime);
+                return date ? formatDateWithoutTimezone(date) : 'Date invalide';
+              })()}
             </Text>
           </View>
         )}
@@ -282,13 +280,10 @@ const StepDetailScreen: React.FC = () => {
               Départ:
             </Text>
             <Text style={[styles.dateValue, { color: theme.colors.text }]}>
-              {new Intl.DateTimeFormat('fr-FR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              }).format(new Date(step.departureDateTime))}
+              {(() => {
+                const date = parseISODate(step.departureDateTime);
+                return date ? formatDateWithoutTimezone(date) : 'Date invalide';
+              })()}
             </Text>
           </View>
         )}
@@ -385,41 +380,61 @@ const StepDetailScreen: React.FC = () => {
     return (
       <ScrollView style={styles.tabContent}>
         {activities.length > 0 ? (
-          activities.map((activity: any, index: number) => (
-            <View key={activity._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
-                {activity.name || `Activité ${index + 1}`}
-              </Text>
-              {activity.type && (
-                <Text style={[styles.itemType, { color: theme.colors.primary }]}>
-                  {activity.type}
-                </Text>
-              )}
-              {activity.address && (
-                <Text style={[styles.itemAddress, { color: theme.colors.textSecondary }]}>
-                  {activity.address}
-                </Text>
-              )}
-              {activity.active !== undefined && (
-                <View style={styles.statusRow}>
-                  <Ionicons 
-                    name={activity.active ? "checkmark-circle" : "close-circle"} 
-                    size={16} 
-                    color={activity.active ? "#28a745" : "#dc3545"} 
-                  />
-                  <Text style={{ color: activity.active ? "#28a745" : "#dc3545" }}>
-                    {activity.active ? "Actif" : "Inactif"}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ))
+          // Tri : actives d'abord, puis par startDateTime croissant
+          [...activities]
+        .sort((a: any, b: any) => {
+          // Actives d'abord
+          if (a.active === b.active) {
+            // Dates croissantes (nulls en dernier)
+            const aDate = a.startDateTime ? new Date(a.startDateTime).getTime() : Infinity;
+            const bDate = b.startDateTime ? new Date(b.startDateTime).getTime() : Infinity;
+            return aDate - bDate;
+          }
+          return b.active ? 1 : -1;
+        })
+        .map((activity: any, index: number) => (
+          <View key={activity._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
+          {activity.name || `Activité ${index + 1}`}
+            </Text>
+            {activity.type && (
+          <Text style={[styles.itemType, { color: theme.colors.primary }]}>
+            {activity.type}
+          </Text>
+            )}
+            {activity.address && (
+          <Text style={[styles.itemAddress, { color: theme.colors.textSecondary }]}>
+            {activity.address}
+          </Text>
+            )}
+            {activity.startDateTime && (
+          <Text style={[styles.itemAddress, { color: theme.colors.textSecondary }]}>
+            Début : {(() => {
+              const date = parseISODate(activity.startDateTime);
+              return date ? formatDateWithoutTimezone(date) : 'Date invalide';
+            })()}
+          </Text>
+            )}
+            {activity.active !== undefined && (
+          <View style={styles.statusRow}>
+            <Ionicons
+              name={activity.active ? "checkmark-circle" : "close-circle"}
+              size={16}
+              color={activity.active ? "#28a745" : "#dc3545"}
+            />
+            <Text style={{ color: activity.active ? "#28a745" : "#dc3545" }}>
+              {activity.active ? "Actif" : "Inactif"}
+            </Text>
+          </View>
+            )}
+          </View>
+        ))
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="walk-outline" size={48} color={theme.colors.textSecondary} />
-            <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-              Aucune activité
-            </Text>
+        <Ionicons name="walk-outline" size={48} color={theme.colors.textSecondary} />
+        <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+          Aucune activité
+        </Text>
           </View>
         )}
       </ScrollView>

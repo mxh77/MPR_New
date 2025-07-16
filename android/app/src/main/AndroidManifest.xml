@@ -29,6 +29,7 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="exp+mprnew"/>
         <data android:scheme="exp+monpetitroadtrip2"/>
+        <data android:scheme="exp+mpr-dev"/>
       </intent-filter>
     </activity>
   </application>

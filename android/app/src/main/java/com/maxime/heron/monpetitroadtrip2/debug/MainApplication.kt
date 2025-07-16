@@ -1,4 +1,4 @@
-package com.maxime.heron.monpetitroadtrip2
+package com.maxime.heron.monpetitroadtrip2.debug
 
 import android.app.Application
 import android.content.res.Configuration

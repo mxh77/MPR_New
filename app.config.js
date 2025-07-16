@@ -8,7 +8,7 @@ export default ({ config }) => {
 
   return {
     ...config,
-    name: isProduction ?  "Mon Petit Roadtrip 2" :"MPR Dev",
+    name: isProduction ?  "MPR 2" :"MPR2 Dev",
     slug: isProduction ? "monpetitroadtrip2":"mpr-dev",
      version: "1.0.0",
     orientation: "portrait",

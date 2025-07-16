@@ -24,6 +24,7 @@ import { useTheme } from '../../contexts';
 import { useSteps } from '../../hooks/useSteps';
 import type { Step, StepType } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
+import { formatDateWithoutTimezone } from '../../utils';
 
 const { width } = Dimensions.get('window');
 
@@ -567,13 +568,7 @@ const StepsListScreen: React.FC = () => {
                   Arrivée:
                 </Text>
                 <Text style={{ fontSize: 12, color: '#495057', flex: 1 }}>
-                  {new Intl.DateTimeFormat('fr-FR', { 
-                    day: '2-digit', 
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }).format(item.startDate)}
+                  {formatDateWithoutTimezone(item.startDate)}
                 </Text>
               </View>
             )}
@@ -585,13 +580,7 @@ const StepsListScreen: React.FC = () => {
                   Départ:
                 </Text>
                 <Text style={{ fontSize: 12, color: '#495057', flex: 1 }}>
-                  {new Intl.DateTimeFormat('fr-FR', { 
-                    day: '2-digit', 
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }).format(item.endDate)}
+                  {formatDateWithoutTimezone(item.endDate)}
                 </Text>
               </View>
             )}
