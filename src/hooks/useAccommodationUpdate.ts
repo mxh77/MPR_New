@@ -215,7 +215,7 @@ const syncAccommodationWithAPI = async (accommodationId: string, accommodationDa
       rating: accommodationData.rating,
       url: accommodationData.url,
       notes: accommodationData.notes,
-      thumbnail: accommodationData.thumbnail,
+      thumbnailUri: accommodationData.thumbnail, // Passer l'URI comme thumbnailUri pour l'upload
     };
 
     console.log('🔄 useAccommodationUpdate - Données à envoyer à l\'API accommodation:', {

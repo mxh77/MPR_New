@@ -189,7 +189,19 @@ export const EditAccommodationScreen: React.FC = () => {
       setWebsite(accommodation.website || accommodation.url || '');
       setPhone(accommodation.phone || '');
       setNotes(accommodation.notes || '');
-      setThumbnail(accommodation.thumbnail || null);
+      
+      // Gestion de la thumbnail : peut être string ou objet avec { url, type, name, fileId, createdAt }
+      if (accommodation.thumbnail) {
+        if (typeof accommodation.thumbnail === 'string') {
+          setThumbnail(accommodation.thumbnail);
+        } else if (accommodation.thumbnail.url) {
+          setThumbnail(accommodation.thumbnail.url);
+        } else {
+          setThumbnail(null);
+        }
+      } else {
+        setThumbnail(null);
+      }
       
       // Champs MongoDB complets
       setEmail(accommodation.email || '');
@@ -240,6 +252,12 @@ export const EditAccommodationScreen: React.FC = () => {
     const checkInDateTime = buildDateTime(checkInDate, checkInTime);
     const checkOutDateTime = buildDateTime(checkOutDate, checkOutTime);
 
+    console.log('🖼️ EditAccommodationScreen - Thumbnail debug:', {
+      originalThumbnail: thumbnail,
+      hasThumbnail: !!thumbnail,
+      willUpload: !!thumbnail
+    });
+
     const accommodationData = {
       name: name.trim(),
       address: address.trim(),
@@ -256,7 +274,7 @@ export const EditAccommodationScreen: React.FC = () => {
       currency: currency || 'EUR',
       nights: nights ? parseInt(nights) : null,
       notes: notes.trim() || null,
-      thumbnail,
+      thumbnail: thumbnail, // Passer l'URI directement pour upload multipart
     };
 
     const result = await updateAccommodationData(stepId, accommodationId, accommodationData);

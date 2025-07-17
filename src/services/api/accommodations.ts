@@ -19,7 +19,10 @@ export interface UpdateAccommodationRequest {
   currency?: string;
   nights?: number | null;
   notes?: string | null;
-  thumbnail?: any;
+}
+
+export interface UpdateAccommodationWithFileRequest extends UpdateAccommodationRequest {
+  thumbnailUri?: string; // URI locale du fichier à uploader
 }
 
 export interface AccommodationResponse {
@@ -33,27 +36,60 @@ export interface AccommodationResponse {
  */
 export const updateAccommodation = async (
   accommodationId: string,
-  accommodationData: UpdateAccommodationRequest
+  accommodationData: UpdateAccommodationWithFileRequest
 ): Promise<any> => {
   try {
     console.log('🏨 updateAccommodation - Début appel API:', {
       accommodationId,
-      accommodationData
+      accommodationData: {
+        ...accommodationData,
+        thumbnailUri: accommodationData.thumbnailUri ? 'URI fourni' : 'Pas de thumbnail'
+      }
     });
 
+    // Séparer les données de base du thumbnail
+    const { thumbnailUri, ...dataFields } = accommodationData;
+
+    // Créer FormData pour gérer le fichier + données
+    const formData = new FormData();
+
+    // Ajouter le thumbnail comme fichier si fourni
+    if (thumbnailUri) {
+      console.log('🏨 updateAccommodation - Ajout du thumbnail comme fichier');
+      formData.append('thumbnail', {
+        uri: thumbnailUri,
+        type: 'image/jpeg',
+        name: 'thumbnail.jpg',
+      } as any);
+    }
+
     // Préparer les données pour l'API - nettoyer les champs null/undefined
-    const cleanedData = Object.entries(accommodationData).reduce((acc, [key, value]) => {
+    const cleanedData = Object.entries(dataFields).reduce((acc, [key, value]) => {
       if (value !== null && value !== undefined) {
         acc[key] = value;
       }
       return acc;
     }, {} as any);
 
-    console.log('🏨 updateAccommodation - Données nettoyées pour API:', cleanedData);
+    // Ajouter les données comme JSON dans le champ 'data'
+    if (Object.keys(cleanedData).length > 0) {
+      formData.append('data', JSON.stringify(cleanedData));
+    }
+
+    console.log('🏨 updateAccommodation - Données préparées:', {
+      hasThumnail: !!thumbnailUri,
+      dataFieldsCount: Object.keys(cleanedData).length,
+      dataFields: Object.keys(cleanedData)
+    });
 
     const response: AxiosResponse<any> = await apiClient.put(
       `/accommodations/${accommodationId}`,
-      cleanedData
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
     );
 
     console.log('🏨 updateAccommodation - Réponse API:', {
