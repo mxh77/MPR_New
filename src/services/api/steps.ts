@@ -15,6 +15,7 @@ export interface CreateStepRequest {
   arrivalDateTime: string;
   departureDateTime: string;
   notes?: string;
+  thumbnail?: string;
 }
 
 export interface UpdateStepRequest extends Partial<Omit<CreateStepRequest, 'roadtripId'>> {}
@@ -92,34 +93,71 @@ export const createStep = async (stepData: CreateStepRequest): Promise<ApiStep> 
 };
 
 /**
- * Met à jour une étape
+ * Met à jour une étape avec support des fichiers
  */
 export const updateStep = async (stepId: string, stepData: UpdateStepRequest): Promise<ApiStep> => {
   try {
     console.log('🔧 updateStep - Début appel API:', { stepId, stepData });
     
-    const response: AxiosResponse<ApiStep> = await apiClient.put(`/steps/${stepId}`, stepData);
-    
-    console.log('🔧 updateStep - Réponse brute reçue:', {
-      status: response.status,
-      statusText: response.statusText,
-      hasData: !!response.data,
-      dataKeys: Object.keys(response.data || {}),
-      stepName: response.data?.name
-    });
-    
-    // L'API retourne directement l'objet step, comme getStepById
-    if (response.data && response.data._id) {
-      console.log('✅ updateStep - Succès, retour des données:', {
-        _id: response.data._id,
-        name: response.data.name,
-        type: response.data.type
+    // Si thumbnail est présent et c'est un URI local, utiliser FormData
+    if (stepData.thumbnail && stepData.thumbnail.startsWith('file://')) {
+      console.log('📁 updateStep - Upload avec thumbnail fichier');
+      
+      const formData = new FormData();
+      
+      // Ajouter le fichier thumbnail
+      const thumbnailUri = stepData.thumbnail;
+      const filename = thumbnailUri.split('/').pop() || 'thumbnail.jpg';
+      const fileType = filename.split('.').pop()?.toLowerCase() || 'jpg';
+      const mimeType = fileType === 'png' ? 'image/png' : 'image/jpeg';
+      
+      formData.append('thumbnail', {
+        uri: thumbnailUri,
+        type: mimeType,
+        name: filename,
+      } as any);
+      
+      // Ajouter les autres données du step
+      Object.keys(stepData).forEach(key => {
+        if (key !== 'thumbnail' && stepData[key as keyof UpdateStepRequest] !== undefined) {
+          formData.append(key, String(stepData[key as keyof UpdateStepRequest]));
+        }
       });
+      
+      const response: AxiosResponse<ApiStep> = await apiClient.put(`/steps/${stepId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      console.log('✅ updateStep - Upload avec fichier réussi');
       return response.data;
+      
     } else {
-      const errorMsg = 'Réponse API invalide - pas de données step';
-      console.error('❌ updateStep - Échec API:', errorMsg, response.data);
-      throw new Error(errorMsg);
+      // Pas de fichier, utilisation JSON classique
+      console.log('📝 updateStep - Mise à jour JSON classique');
+      const response: AxiosResponse<ApiStep> = await apiClient.put(`/steps/${stepId}`, stepData);
+      
+      console.log('🔧 updateStep - Réponse brute reçue:', {
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data,
+        dataKeys: Object.keys(response.data || {}),
+        stepName: response.data?.name
+      });
+      
+      if (response.data && response.data._id) {
+        console.log('✅ updateStep - Succès, retour des données:', {
+          _id: response.data._id,
+          name: response.data.name,
+          type: response.data.type
+        });
+        return response.data;
+      } else {
+        const errorMsg = 'Réponse API invalide - pas de données step';
+        console.error('❌ updateStep - Échec API:', errorMsg, response.data);
+        throw new Error(errorMsg);
+      }
     }
   } catch (error) {
     console.error('❌ updateStep - Erreur réseau/parsing:', error);

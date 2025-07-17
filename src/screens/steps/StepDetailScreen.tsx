@@ -28,6 +28,7 @@ import type { Step } from '../../types';
 import type { ApiStep } from '../../services/api/roadtrips';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { formatDateWithoutTimezone, parseISODate } from '../../utils';
+import { GoogleMap } from '../../components/common';
 
 const { width, height } = Dimensions.get('window');
 
@@ -94,33 +95,67 @@ const StepDetailScreen: React.FC = () => {
    * Fonction pour extraire l'URI de l'image depuis l'objet thumbnail
    */
   const getImageUri = (thumbnail: any): string | null => {
-    // console.log('🖼️ StepDetailScreen - getImageUri - thumbnail reçu:');
+    console.log('🖼️ StepDetailScreen - getImageUri - thumbnail reçu:', typeof thumbnail, thumbnail);
     
     if (!thumbnail) {
-      // console.log('🖼️ StepDetailScreen - getImageUri - thumbnail null/undefined');
+      console.log('🖼️ StepDetailScreen - getImageUri - thumbnail null/undefined');
       return null;
     }
     
-    // Si c'est déjà une chaîne
-    if (typeof thumbnail === 'string') {
-      // console.log('🖼️ StepDetailScreen - getImageUri - string:', thumbnail);
-      return thumbnail;
+    // Si c'est déjà une chaîne valide
+    if (typeof thumbnail === 'string' && thumbnail.trim().length > 0) {
+      console.log('🖼️ StepDetailScreen - getImageUri - string:', thumbnail);
+      return thumbnail.trim();
     }
     
     // Si c'est un objet avec une propriété url (structure API)
-    if (typeof thumbnail === 'object' && thumbnail.url && typeof thumbnail.url === 'string') {
-      // console.log('🖼️ StepDetailScreen - getImageUri - object.url:', thumbnail.url);
-      return thumbnail.url;
+    if (typeof thumbnail === 'object' && thumbnail !== null) {
+      if (thumbnail.url && typeof thumbnail.url === 'string' && thumbnail.url.trim().length > 0) {
+        console.log('🖼️ StepDetailScreen - getImageUri - object.url:', thumbnail.url);
+        return thumbnail.url.trim();
+      }
+      
+      // Si c'est un objet avec une propriété uri
+      if (thumbnail.uri && typeof thumbnail.uri === 'string' && thumbnail.uri.trim().length > 0) {
+        console.log('🖼️ StepDetailScreen - getImageUri - object.uri:', thumbnail.uri);
+        return thumbnail.uri.trim();
+      }
     }
     
-    // Si c'est un objet avec une propriété uri
-    if (typeof thumbnail === 'object' && thumbnail.uri && typeof thumbnail.uri === 'string') {
-      // console.log('🖼️ StepDetailScreen - getImageUri - object.uri:', thumbnail.uri);
-      return thumbnail.uri;
-    }
-    
-    // console.log('🖼️ StepDetailScreen - getImageUri - Aucun format reconnu pour:', thumbnail);
+    console.log('🖼️ StepDetailScreen - getImageUri - Aucun format reconnu pour:', thumbnail);
     return null;
+  };
+
+  /**
+   * Composant sécurisé pour le rendu d'images
+   */
+  const SafeImage: React.FC<{ 
+    thumbnail: any; 
+    style: any; 
+    placeholderIcon: keyof typeof Ionicons.glyphMap;
+    onError?: (error: any) => void;
+  }> = ({ thumbnail, style, placeholderIcon, onError }) => {
+    const imageUri = getImageUri(thumbnail);
+    
+    if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
+      return (
+        <Image
+          source={{ uri: imageUri }}
+          style={style}
+          resizeMode="cover"
+          onError={(error) => {
+            console.warn('🖼️ SafeImage - Erreur chargement:', error.nativeEvent.error, 'URI:', imageUri);
+            if (onError) onError(error);
+          }}
+        />
+      );
+    } else {
+      return (
+        <View style={[style, styles.placeholderImage]}>
+          <Ionicons name={placeholderIcon} size={32} color={theme.colors.textSecondary} />
+        </View>
+      );
+    }
   };
 
   /**
@@ -135,22 +170,24 @@ const StepDetailScreen: React.FC = () => {
     ];
 
     // Ajouter l'onglet Hébergements si c'est une étape Stage avec des accommodations
-    if (step.type === 'Stage' && (step as any).accommodations?.length > 0) {
+    const accommodations = (step as any)?.accommodations;
+    if (step.type === 'Stage' && Array.isArray(accommodations) && accommodations.length > 0) {
       newRoutes.push({
         key: 'accommodations',
         title: 'Hébergements',
         icon: 'bed',
-        badge: (step as any).accommodations.length
+        badge: accommodations.length
       });
     }
 
     // Ajouter l'onglet Activités si il y en a
-    if ((step as any).activities?.length > 0) {
+    const activities = (step as any)?.activities;
+    if (Array.isArray(activities) && activities.length > 0) {
       newRoutes.push({
         key: 'activities',
         title: 'Activités',
         icon: 'walk',
-        badge: (step as any).activities.length
+        badge: activities.length
       });
     }
 
@@ -250,41 +287,32 @@ const StepDetailScreen: React.FC = () => {
         />
       }
     >
-      {/* Image principale */}
-      {(() => {
-        const imageUri = getImageUri(step?.thumbnail);
-        console.log('🖼️ StepDetailScreen - URI calculée pour', step?.title);
-        
-        // Vérification de sécurité pour s'assurer que l'URI est bien une chaîne
-        if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
-          return (
-            <Image
-              source={{ uri: imageUri }}
-              style={styles.mainImage}
-              resizeMode="cover"
-              onLoad={() => console.log('🖼️ StepDetailScreen - Image chargée avec succès:')}
-              onError={(error) => {
-                console.warn('🖼️ StepDetailScreen - Erreur de chargement d\'image:', error.nativeEvent.error, 'pour URI:', imageUri);
-              }}
-            />
-          );
-        } else {
-          return (
-            <View style={[styles.mainImage, styles.placeholderImage]}>
-              <Ionicons name="image-outline" size={48} color={theme.colors.textSecondary} />
-              <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
-                Aucune image
-              </Text>
-            </View>
-          );
-        }
-      })()}
-
       {/* Informations principales */}
       <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
         <Text style={[styles.title, { color: theme.colors.text }]}>
           {step?.title || 'Titre non défini'}
         </Text>
+        
+        {/* Thumbnail de l'étape intégré dans la card */}
+        {(() => {
+          if (!step) return null;
+          
+          const imageUri = getImageUri(step?.thumbnail);
+          
+          if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
+            return (
+              <Image
+                source={{ uri: imageUri }}
+                style={styles.stepThumbnail}
+                resizeMode="cover"
+                onError={(error) => {
+                  console.warn('🖼️ Erreur chargement thumbnail étape:', error.nativeEvent.error);
+                }}
+              />
+            );
+          }
+          return null;
+        })()}
         
         {step?.location?.address && (
           <View style={styles.addressRow}>
@@ -368,7 +396,7 @@ const StepDetailScreen: React.FC = () => {
    * Rendu de l'onglet Hébergements
    */
   const renderAccommodationsTab = () => {
-    const accommodations = (step as any)?.accommodations || [];
+    const accommodations = step ? (step as any)?.accommodations || [] : [];
     
     return (
       <ScrollView style={styles.tabContent}>
@@ -376,28 +404,11 @@ const StepDetailScreen: React.FC = () => {
           accommodations.map((accommodation: any, index: number) => (
             <View key={accommodation._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
               {/* Thumbnail de l'hébergement */}
-              {(() => {
-                const imageUri = getImageUri(accommodation.thumbnail);
-                
-                if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
-                  return (
-                    <Image
-                      source={{ uri: imageUri }}
-                      style={styles.itemImage}
-                      resizeMode="cover"
-                      onError={(error) => {
-                        console.warn('🖼️ Erreur chargement image hébergement:', error.nativeEvent.error);
-                      }}
-                    />
-                  );
-                } else {
-                  return (
-                    <View style={[styles.itemImage, styles.placeholderImage]}>
-                      <Ionicons name="bed-outline" size={32} color={theme.colors.textSecondary} />
-                    </View>
-                  );
-                }
-              })()}
+              <SafeImage 
+                thumbnail={accommodation.thumbnail}
+                style={styles.itemImage}
+                placeholderIcon="bed-outline"
+              />
               
               <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
                 {accommodation.name || `Hébergement ${index + 1}`}
@@ -407,6 +418,7 @@ const StepDetailScreen: React.FC = () => {
                   {accommodation.address}
                 </Text>
               )}
+              
               {/* Affichage des dates - alignement horizontal */}
               {(accommodation.startDateTime || accommodation.arrivalDateTime || accommodation.endDateTime || accommodation.departureDateTime) && (
                 <View style={styles.dateContainer}>
@@ -442,6 +454,32 @@ const StepDetailScreen: React.FC = () => {
                   </Text>
                 </View>
               )}
+              
+              {/* Boutons d'action */}
+              <View style={styles.actionButtons}>
+                <TouchableOpacity 
+                  style={[styles.cardActionButton, styles.cardActionButtonPrimary]}
+                  onPress={() => {
+                    // TODO: Ouvrir site web de l'hébergement
+                    console.log('Ouvrir site web:', accommodation.name);
+                  }}
+                >
+                  <Text style={styles.cardActionButtonText}>Ouvrir Site Web</Text>
+                </TouchableOpacity>
+                
+                {accommodation.latitude && accommodation.longitude && (
+                  <TouchableOpacity 
+                    style={[styles.cardActionButton, styles.cardActionButtonSecondary]}
+                    onPress={() => {
+                      const url = `https://www.google.com/maps/search/?api=1&query=${accommodation.latitude},${accommodation.longitude}`;
+                      // TODO: Ouvrir URL externe
+                      console.log('Ouvrir Google Maps:', url);
+                    }}
+                  >
+                    <Text style={styles.cardActionButtonTextSecondary}>Ouvrir dans Google Maps</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           ))
         ) : (
@@ -460,7 +498,7 @@ const StepDetailScreen: React.FC = () => {
    * Rendu de l'onglet Activités
    */
   const renderActivitiesTab = () => {
-    const activities = (step as any)?.activities || [];
+    const activities = step ? (step as any)?.activities || [] : [];
     
     return (
       <ScrollView style={styles.tabContent}>
@@ -480,28 +518,11 @@ const StepDetailScreen: React.FC = () => {
         .map((activity: any, index: number) => (
           <View key={activity._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
             {/* Thumbnail de l'activité */}
-            {(() => {
-              const imageUri = getImageUri(activity.thumbnail);
-              
-              if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
-                return (
-                  <Image
-                    source={{ uri: imageUri }}
-                    style={styles.itemImage}
-                    resizeMode="cover"
-                    onError={(error) => {
-                      console.warn('🖼️ Erreur chargement image activité:', error.nativeEvent.error);
-                    }}
-                  />
-                );
-              } else {
-                return (
-                  <View style={[styles.itemImage, styles.placeholderImage]}>
-                    <Ionicons name="walk-outline" size={32} color={theme.colors.textSecondary} />
-                  </View>
-                );
-              }
-            })()}
+            <SafeImage 
+              thumbnail={activity.thumbnail}
+              style={styles.itemImage}
+              placeholderIcon="walk-outline"
+            />
             
             <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
           {activity.name || `Activité ${index + 1}`}
@@ -516,6 +537,7 @@ const StepDetailScreen: React.FC = () => {
             {activity.address}
           </Text>
             )}
+            
             {/* Affichage des dates - alignement horizontal */}
             {(activity.startDateTime || activity.endDateTime) && (
               <View style={styles.dateContainer}>
@@ -549,6 +571,32 @@ const StepDetailScreen: React.FC = () => {
             </Text>
           </View>
             )}
+            
+            {/* Boutons d'action */}
+            <View style={styles.actionButtons}>
+              <TouchableOpacity 
+                style={[styles.cardActionButton, styles.cardActionButtonPrimary]}
+                onPress={() => {
+                  // TODO: Ouvrir site web de l'activité
+                  console.log('Ouvrir site web:', activity.name);
+                }}
+              >
+                <Text style={styles.cardActionButtonText}>Ouvrir Site Web</Text>
+              </TouchableOpacity>
+              
+              {activity.latitude && activity.longitude && (
+                <TouchableOpacity 
+                  style={[styles.cardActionButton, styles.cardActionButtonSecondary]}
+                  onPress={() => {
+                    const url = `https://www.google.com/maps/search/?api=1&query=${activity.latitude},${activity.longitude}`;
+                    // TODO: Ouvrir URL externe
+                    console.log('Ouvrir Google Maps:', url);
+                  }}
+                >
+                  <Text style={styles.cardActionButtonTextSecondary}>Ouvrir dans Google Maps</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         ))
         ) : (
@@ -677,6 +725,116 @@ const StepDetailScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {renderHeader()}
+      
+      {/* Carte commune au-dessus des onglets */}
+      {step?.location?.latitude && step?.location?.longitude && (
+        <View style={styles.globalMapContainer}>
+          {(() => {
+            const accommodations = step ? (step as any)?.accommodations || [] : [];
+            const activities = step ? (step as any)?.activities || [] : [];
+            
+            const markers = [
+              // Marqueur principal pour l'étape (drapeau bleu)
+              {
+                id: 'main-step',
+                latitude: step.location.latitude,
+                longitude: step.location.longitude,
+                title: step.title || 'Étape',
+                description: step.location.address,
+                color: '#2196F3', // Bleu pour l'étape principale
+                type: 'step' as const,
+              },
+              // Marqueurs pour les hébergements (lit vert)
+              ...accommodations
+                .filter((acc: any) => acc.latitude && acc.longitude)
+                .map((acc: any, index: number) => ({
+                  id: `accommodation-${index}`,
+                  latitude: acc.latitude!,
+                  longitude: acc.longitude!,
+                  title: acc.name || `Hébergement ${index + 1}`,
+                  description: acc.address,
+                  color: '#4CAF50', // Vert pour hébergements
+                  type: 'accommodation' as const,
+                })),
+              // Marqueurs pour les activités (icônes selon type)
+              ...activities
+                .filter((act: any) => act.latitude && act.longitude)
+                .map((act: any, index: number) => {
+                  // Déterminer le type d'activité pour l'icône appropriée
+                  let activityType = 'activity'; // par défaut
+                  if (act.type) {
+                    // Mapper les types d'activités aux types de marqueurs
+                    switch (act.type.toLowerCase()) {
+                      case 'hiking':
+                      case 'randonnée':
+                      case 'randonnee':
+                        activityType = 'hiking';
+                        break;
+                      case 'transport':
+                      case 'voiture':
+                      case 'car':
+                        activityType = 'transport';
+                        break;
+                      case 'visit':
+                      case 'visite':
+                      case 'museum':
+                      case 'monument':
+                        activityType = 'visit';
+                        break;
+                      case 'restaurant':
+                      case 'food':
+                      case 'repas':
+                        activityType = 'restaurant';
+                        break;
+                      case 'courses':
+                      case 'shopping':
+                        activityType = 'courses';
+                        break;
+                      default:
+                        activityType = 'activity';
+                    }
+                  }
+                  
+                  return {
+                    id: `activity-${index}`,
+                    latitude: act.latitude!,
+                    longitude: act.longitude!,
+                    title: act.name || `Activité ${index + 1}`,
+                    description: act.address,
+                    color: '#FF9800', // Orange pour activités
+                    type: activityType as any,
+                  };
+                }),
+            ];
+            
+            console.log('🗺️ StepDetailScreen - Markers pour carte:', {
+              totalMarkers: markers.length,
+              mainStep: 1,
+              accommodations: accommodations.filter((acc: any) => acc.latitude && acc.longitude).length,
+              activities: activities.filter((act: any) => act.latitude && act.longitude).length,
+              allMarkers: markers.map(m => ({ id: m.id, title: m.title, lat: m.latitude, lng: m.longitude }))
+            });
+            
+            return (
+              <GoogleMap
+                title="Vue d'ensemble"
+                latitude={step.location.latitude}
+                longitude={step.location.longitude}
+                address={step.location.address}
+                height={250}
+                markers={markers}
+                showControls={true}
+                enableFitBounds={true}
+                style={styles.globalMap}
+                onFullScreen={() => {
+                  // TODO: Implémenter la vue carte plein écran
+                  console.log('🗺️ Ouverture carte plein écran');
+                }}
+              />
+            );
+          })()}
+        </View>
+      )}
       
       <TabView
         navigationState={{ index: tabIndex, routes }}
@@ -843,6 +1001,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
   },
+  stepThumbnail: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
   addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -965,6 +1129,48 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     marginTop: 16,
+  },
+
+  // Carte globale
+  globalMapContainer: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  globalMap: {
+    marginBottom: 0,
+  },
+
+  // Boutons d'action pour cards
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  cardActionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cardActionButtonPrimary: {
+    backgroundColor: '#2196F3',
+  },
+  cardActionButtonSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#2196F3',
+  },
+  cardActionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  cardActionButtonTextSecondary: {
+    color: '#2196F3',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

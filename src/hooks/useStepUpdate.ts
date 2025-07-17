@@ -67,7 +67,7 @@ const updateStepInLocal = async (stepId: string, apiStep: ApiStep): Promise<void
         travel_time_note: apiStep.travelTimeNote || '',
         activities: JSON.stringify(apiStep.activities || []),
         accommodations: JSON.stringify(apiStep.accommodations || []),
-        thumbnail: JSON.stringify(apiStep.thumbnail || null),
+        thumbnail: apiStep.thumbnail || null, // String directe, pas JSON.stringify
         last_sync_at: Date.now(),
         updated_at: Date.now(),
       };
@@ -152,6 +152,7 @@ export const useStepUpdate = (): UseStepUpdateResult => {
             if (data.address !== undefined) step._setRaw('address', data.address);
             if (data.latitude !== undefined) step._setRaw('latitude', data.latitude);
             if (data.longitude !== undefined) step._setRaw('longitude', data.longitude);
+            if (data.thumbnail !== undefined) step._setRaw('thumbnail', data.thumbnail);
             
             // Gestion des dates
             if (data.arrivalDateTime !== undefined) {
@@ -195,7 +196,7 @@ export const useStepUpdate = (): UseStepUpdateResult => {
         documents: [],
         accommodations: [],
         activities: [],
-        thumbnail: undefined,
+        thumbnail: data.thumbnail || undefined,
       };
 
       // PHASE 2: Synchronisation API en arrière-plan (non bloquante)

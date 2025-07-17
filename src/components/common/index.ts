@@ -9,6 +9,9 @@ export { DatePickerModal } from './DatePickerModal';
 export { CurrencyPickerModal } from './CurrencyPickerModal';
 export { default as GooglePlacesInput } from './GooglePlacesInput';
 export { default as AddressInput } from './AddressInput';
+export { default as ThumbnailPicker } from './ThumbnailPicker';
+export { default as GoogleMap } from './GoogleMap';
+export { default as StepListWithMap } from './StepListWithMap';
 
 // Types
 export type { ButtonProps } from './Button';

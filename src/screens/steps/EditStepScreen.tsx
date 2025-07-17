@@ -29,7 +29,7 @@ import type { Step } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { formatDateWithoutTimezone, parseISODate } from '../../utils';
 import { colors } from '../../constants/colors';
-import { GooglePlacesInput } from '../../components/common';
+import { GooglePlacesInput, ThumbnailPicker } from '../../components/common';
 import ENV from '../../config/env';
 
 // ==========================================
@@ -244,6 +244,7 @@ const EditStepScreen: React.FC = () => {
     arrivalTime: '',
     departureDate: '',
     departureTime: '',
+    thumbnail: undefined as string | undefined,
   });
 
   // États pour la sauvegarde
@@ -320,6 +321,7 @@ const EditStepScreen: React.FC = () => {
         arrivalTime,
         departureDate,
         departureTime,
+        thumbnail: step.thumbnail || undefined,
       });
     }
   }, [step]);
@@ -359,6 +361,7 @@ const EditStepScreen: React.FC = () => {
         address: currentFormData.address.trim(),
         latitude: currentFormData.latitude,
         longitude: currentFormData.longitude,
+        thumbnail: currentFormData.thumbnail,
         arrivalDateTime,
         departureDateTime,
       };
@@ -528,6 +531,38 @@ const EditStepScreen: React.FC = () => {
     };
   }, []);
 
+  // Fonction pour gérer la sélection d'une image thumbnail
+  const handleThumbnailSelected = useCallback((imageUri: string) => {
+    console.log('🎯 DEBUG - Thumbnail sélectionné:', imageUri);
+    
+    setFormData(prev => ({
+      ...prev,
+      thumbnail: imageUri
+    }));
+    
+    // Mettre à jour la ref pour handleSave
+    formDataRef.current = {
+      ...formDataRef.current,
+      thumbnail: imageUri
+    };
+  }, []);
+
+  // Fonction pour gérer la suppression du thumbnail
+  const handleThumbnailRemoved = useCallback(() => {
+    console.log('🎯 DEBUG - Thumbnail supprimé');
+    
+    setFormData(prev => ({
+      ...prev,
+      thumbnail: undefined
+    }));
+    
+    // Mettre à jour la ref pour handleSave
+    formDataRef.current = {
+      ...formDataRef.current,
+      thumbnail: undefined
+    };
+  }, []);
+
   // Debug pour les callbacks de champs (après définition)
   const callbackRefCount = React.useRef(0);
   const lastNameChangeRef = React.useRef(handleNameChange);
@@ -653,6 +688,14 @@ const EditStepScreen: React.FC = () => {
               style={styles.googlePlacesContainer}
             />
           </View>
+
+          {/* Thumbnail */}
+          <ThumbnailPicker
+            label="Photo de l'étape"
+            value={formData.thumbnail}
+            onImageSelected={handleThumbnailSelected}
+            onImageRemoved={handleThumbnailRemoved}
+          />
 
           {/* Date et heure d'arrivée */}
           <CustomDateTimeRow

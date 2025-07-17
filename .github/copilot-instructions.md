@@ -108,6 +108,15 @@ const updateData = useCallback(async (id: string, data: any) => {
 - Stockage coordonnées dans `location: { latitude, longitude, address }`
 - Configuration : `EXPO_PUBLIC_GOOGLE_API_KEY` dans .env
 
+### GoogleMap - Affichage Cartes Interactive
+**PROBLÈME** : Visualisation géographique manquante pour étapes/activités/hébergements
+**SOLUTION** : Composant GoogleMap réutilisable avec react-native-maps
+- `<GoogleMap latitude={lat} longitude={lng} address={addr} />` pour cartes simples
+- Props configurables : `height`, `disabled`, `markers`, `onMapPress`
+- Validation automatique des coordonnées et gestion d'erreurs
+- Intégration StepDetailScreen : carte principale + cartes mini pour accommodations/activités
+- `<StepListWithMap />` pour basculer entre vue liste et carte globale
+
 ### DataRefreshContext - Rafraîchissement Sans Boucles
 **PROBLÈME** : Données non rafraîchies après sauvegarde + boucles infinies
 **SOLUTION** : Système notification centralisé par timestamp
