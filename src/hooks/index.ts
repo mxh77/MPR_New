@@ -9,6 +9,8 @@ export { useRoadtrips } from './useRoadtripsExpoGo';  // Version simplifiée tem
 export { default as useRoadtripsWithApi } from './useRoadtripsWithApi'; // Version avec API
 export { default as useRoadtripDetail } from './useRoadtripDetail'; // Hook pour détail roadtrip
 export { useSteps } from './useSteps'; // Hook pour les étapes
+export { useAccommodationDetail } from './useAccommodationDetail'; // Hook pour accommodation detail
+export { useAccommodationUpdate } from './useAccommodationUpdate'; // Hook pour accommodation update
 
 // Types
 export type { NetworkState } from './useNetworkStatus';

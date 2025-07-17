@@ -533,6 +533,79 @@ const StepDetailScreen: React.FC = () => {
       accommodationsCount: accommodations.length,
       accommodationsType: typeof accommodations
     });
+
+    /**
+     * Navigation vers l'édition d'un accommodation
+     */
+    const handleEditAccommodation = (accommodation: any) => {
+      if (!accommodation?._id || !step?._id) {
+        Alert.alert('Erreur', 'Impossible d\'éditer cet hébergement');
+        return;
+      }
+      
+      console.log('📝 Navigation vers édition accommodation:', {
+        stepId: step._id,
+        accommodationId: accommodation._id,
+        name: accommodation.name
+      });
+      
+      navigation.navigate('EditAccommodation', {
+        stepId: step._id,
+        accommodationId: accommodation._id
+      });
+    };
+
+    /**
+     * Menu d'actions pour un accommodation
+     */
+    const showAccommodationActionMenu = (accommodation: any) => {
+      const options = [
+        {
+          text: 'Éditer',
+          onPress: () => handleEditAccommodation(accommodation),
+          style: 'default' as const
+        },
+        {
+          text: 'Annuler',
+          style: 'cancel' as const
+        }
+      ];
+
+      Alert.alert(
+        accommodation.name || 'Hébergement',
+        'Choisissez une action',
+        options
+      );
+    };
+
+    /**
+     * Ouvrir une URL externe (site web)
+     */
+    const handleOpenWebsite = (url: string, name: string) => {
+      if (!url) {
+        Alert.alert('Information', 'Aucun site web défini pour cet hébergement');
+        return;
+      }
+      
+      // TODO: Implémenter ouverture URL avec Linking
+      console.log('🌐 Ouvrir site web:', { url, name });
+      Alert.alert('Site web', `Ouverture du site web de ${name}\n${url}`);
+    };
+
+    /**
+     * Ouvrir dans Google Maps
+     */
+    const handleOpenMaps = (accommodation: any) => {
+      if (!accommodation.latitude || !accommodation.longitude) {
+        Alert.alert('Information', 'Aucune localisation définie pour cet hébergement');
+        return;
+      }
+      
+      const url = `https://www.google.com/maps/search/?api=1&query=${accommodation.latitude},${accommodation.longitude}`;
+      // TODO: Implémenter ouverture URL avec Linking
+      console.log('🗺️ Ouvrir Google Maps:', { url, name: accommodation.name });
+      Alert.alert('Google Maps', `Ouverture dans Google Maps\n${accommodation.name}`);
+    };
     
     return (
       <ScrollView style={styles.tabContent}>
@@ -540,88 +613,185 @@ const StepDetailScreen: React.FC = () => {
           accommodations
             .filter((accommodation: any) => accommodation && accommodation._id) // Filtrer les accommodations valides
             .map((accommodation: any, index: number) => (
-            <View key={accommodation._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
-              {/* Thumbnail de l'hébergement - sécurisé */}
-              {accommodation && (
-                <SafeImage 
-                  thumbnail={accommodation.thumbnail || null}
-                  style={styles.itemImage}
-                  placeholderIcon="bed-outline"
-                />
-              )}
               
-              <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
-                {accommodation.name || `Hébergement ${index + 1}`}
-              </Text>
-              {accommodation.address && (
-                <Text style={[styles.itemAddress, { color: theme.colors.textSecondary }]}>
-                  {accommodation.address}
+              <View key={accommodation._id || index} style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
+                
+                {/* Nom de l'accommodation au-dessus du thumbnail - Style identique à l'onglet Infos */}
+                <Text style={[styles.title, { color: theme.colors.text }]}>
+                  {accommodation.name || `Hébergement ${index + 1}`}
                 </Text>
-              )}
-              
-              {/* Affichage des dates - alignement horizontal */}
-              {(accommodation.startDateTime || accommodation.arrivalDateTime || accommodation.endDateTime || accommodation.departureDateTime) && (
-                <View style={styles.dateContainer}>
-                  {(accommodation.startDateTime || accommodation.arrivalDateTime) && (
-                    <Text style={[styles.dateLeft, { color: theme.colors.textSecondary }]}>
-                      Début : {(() => {
+                
+                {/* Thumbnail avec menu d'actions - Structure identique à l'onglet Infos */}
+                {(() => {
+                  const imageUri = getImageUri(accommodation.thumbnail);
+                  
+                  if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
+                    return (
+                      <View style={styles.thumbnailContainer}>
+                        {isValidImageUri(imageUri) ? (
+                          <SafeImage 
+                            thumbnail={accommodation.thumbnail}
+                            style={styles.stepThumbnail}
+                            placeholderIcon="bed-outline"
+                          />
+                        ) : (
+                          <View style={[styles.stepThumbnail, styles.placeholderImage, { backgroundColor: '#f0f0f0' }]}>
+                            <Ionicons name="bed-outline" size={32} color={theme.colors.textSecondary} />
+                            <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                              Image non valide
+                            </Text>
+                          </View>
+                        )}
+                        {/* Menu d'actions (3 points) - Style identique à l'onglet Infos */}
+                        <TouchableOpacity 
+                          style={styles.thumbnailMenuButton}
+                          onPress={() => showAccommodationActionMenu(accommodation)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Ionicons name="ellipsis-vertical" size={18} color="white" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  } else {
+                    return (
+                      <View style={styles.thumbnailContainer}>
+                        <TouchableOpacity 
+                          style={[styles.stepThumbnailPlaceholder, styles.placeholderImage]}
+                          onPress={() => handleEditAccommodation(accommodation)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="bed-outline" size={32} color={theme.colors.textSecondary} />
+                          <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                            Appuyer pour ajouter une photo
+                          </Text>
+                        </TouchableOpacity>
+                        {/* Menu d'actions pour placeholder - Style identique à l'onglet Infos */}
+                        <TouchableOpacity 
+                          style={styles.thumbnailMenuButtonPlaceholder}
+                          onPress={() => showAccommodationActionMenu(accommodation)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+                })()}
+                
+                {/* Type d'hébergement - Style cohérent avec les autres infos */}
+                {accommodation.type && (
+                  <View style={styles.addressRow}>
+                    <Ionicons name="business" size={16} color={theme.colors.primary} />
+                    <Text style={[styles.address, { color: theme.colors.textSecondary }]}>
+                      {accommodation.type.charAt(0).toUpperCase() + accommodation.type.slice(1)}
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Adresse - Style identique à l'onglet Infos */}
+                {accommodation.address && (
+                  <View style={styles.addressRow}>
+                    <Ionicons name="location" size={16} color={theme.colors.primary} />
+                    <Text style={[styles.address, { color: theme.colors.textSecondary }]}>
+                      {accommodation.address}
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Dates de séjour - Style identique aux dates de l'onglet Infos */}
+                {(accommodation.startDateTime || accommodation.arrivalDateTime) && (
+                  <View style={styles.dateRow}>
+                    <Ionicons name="log-in" size={16} color="#28a745" />
+                    <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>
+                      Check-in:
+                    </Text>
+                    <Text style={[styles.dateValue, { color: theme.colors.text }]}>
+                      {(() => {
                         const dateString = accommodation.startDateTime || accommodation.arrivalDateTime;
                         const date = parseISODate(dateString);
                         return date ? formatDateWithoutTimezone(date) : 'N/A';
                       })()}
                     </Text>
-                  )}
-                  {(accommodation.endDateTime || accommodation.departureDateTime) && (
-                    <Text style={[styles.dateRight, { color: theme.colors.textSecondary }]}>
-                      Fin : {(() => {
+                  </View>
+                )}
+                
+                {(accommodation.endDateTime || accommodation.departureDateTime) && (
+                  <View style={styles.dateRow}>
+                    <Ionicons name="log-out" size={16} color="#dc3545" />
+                    <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>
+                      Check-out:
+                    </Text>
+                    <Text style={[styles.dateValue, { color: theme.colors.text }]}>
+                      {(() => {
                         const dateString = accommodation.endDateTime || accommodation.departureDateTime;
                         const date = parseISODate(dateString);
                         return date ? formatDateWithoutTimezone(date) : 'N/A';
                       })()}
                     </Text>
-                  )}
-                </View>
-              )}
-              {accommodation.active !== undefined && (
-                <View style={styles.statusRow}>
-                  <Ionicons 
-                    name={accommodation.active ? "checkmark-circle" : "close-circle"} 
-                    size={16} 
-                    color={accommodation.active ? "#28a745" : "#dc3545"} 
-                  />
-                  <Text style={{ color: accommodation.active ? "#28a745" : "#dc3545" }}>
-                    {accommodation.active ? "Actif" : "Inactif"}
-                  </Text>
-                </View>
-              )}
-              
-              {/* Boutons d'action */}
-              <View style={styles.actionButtons}>
-                <TouchableOpacity 
-                  style={[styles.cardActionButton, styles.cardActionButtonPrimary]}
-                  onPress={() => {
-                    // TODO: Ouvrir site web de l'hébergement
-                    console.log('Ouvrir site web:', accommodation.name);
-                  }}
-                >
-                  <Text style={styles.cardActionButtonText}>Ouvrir Site Web</Text>
-                </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Prix et note - Style cohérent */}
+                {accommodation.pricePerNight && (
+                  <View style={styles.dateRow}>
+                    <Ionicons name="card" size={16} color={theme.colors.primary} />
+                    <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>
+                      Prix:
+                    </Text>
+                    <Text style={[styles.dateValue, { color: theme.colors.text }]}>
+                      {accommodation.pricePerNight}€/nuit
+                    </Text>
+                  </View>
+                )}
                 
-                {accommodation.latitude && accommodation.longitude && (
-                  <TouchableOpacity 
-                    style={[styles.cardActionButton, styles.cardActionButtonSecondary]}
-                    onPress={() => {
-                      const url = `https://www.google.com/maps/search/?api=1&query=${accommodation.latitude},${accommodation.longitude}`;
-                      // TODO: Ouvrir URL externe
-                      console.log('Ouvrir Google Maps:', url);
-                    }}
-                  >
-                    <Text style={styles.cardActionButtonTextSecondary}>Ouvrir dans Google Maps</Text>
-                  </TouchableOpacity>
+                {accommodation.rating && (
+                  <View style={styles.dateRow}>
+                    <Ionicons name="star" size={16} color="#FFD700" />
+                    <Text style={[styles.dateLabel, { color: theme.colors.textSecondary }]}>
+                      Note:
+                    </Text>
+                    <Text style={[styles.dateValue, { color: theme.colors.text }]}>
+                      {accommodation.rating}/5
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Notes/Description */}
+                {accommodation.notes && (
+                  <View style={styles.descriptionSection}>
+                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                      Notes
+                    </Text>
+                    <Text style={[styles.description, { color: theme.colors.text }]}>
+                      {accommodation.notes}
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Boutons d'action discrets - Icônes seulement */}
+                {(accommodation.url || (accommodation.latitude && accommodation.longitude)) && (
+                  <View style={styles.accommodationActionButtons}>
+                    {accommodation.url && (
+                      <TouchableOpacity 
+                        style={styles.accommodationActionIcon}
+                        onPress={() => handleOpenWebsite(accommodation.url, accommodation.name)}
+                      >
+                        <Ionicons name="globe-outline" size={24} color={theme.colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                    
+                    {accommodation.latitude && accommodation.longitude && (
+                      <TouchableOpacity 
+                        style={styles.accommodationActionIcon}
+                        onPress={() => handleOpenMaps(accommodation)}
+                      >
+                        <Ionicons name="map-outline" size={24} color={theme.colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
               </View>
-            </View>
-          ))
+            ))
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="bed-outline" size={48} color={theme.colors.textSecondary} />
@@ -1352,6 +1522,23 @@ const styles = StyleSheet.create({
     color: '#2196F3',
     fontSize: 14,
     fontWeight: '500',
+  },
+
+  // Styles spécifiques pour accommodations - Boutons d'action discrets uniquement
+  accommodationActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 20,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+  },
+  accommodationActionIcon: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
   },
 });
 

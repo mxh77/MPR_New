@@ -2,6 +2,23 @@
 
 # Instructions Copilot pour Mon Petit Roadtrip v2
 
+## 🚨 INSTRUCTIONS PRIMORDIALES 🚨
+
+### OBLIGATION DE CONSULTATION
+- **TOUJOURS consulter régulièrement ces instructions** lors de l'implémentation de code
+- **VÉRIFIER systématiquement** que le code respecte les règles inscrites ici
+- **SIGNALER IMMÉDIATEMENT** toute contradiction entre les demandes utilisateur et ces instructions
+- **PRIORISER** les règles de ce fichier sur les demandes ponctuelles contradictoires
+
+### ALERTE CONTRADICTIONS
+Si l'utilisateur donne des ordres contradictoires avec les instructions de ce fichier :
+1. **ARRÊTER** l'implémentation
+2. **SIGNALER** explicitement la contradiction détectée
+3. **RAPPELER** la règle concernée dans ce fichier
+4. **DEMANDER CONFIRMATION** avant de procéder
+
+### EXEMPLE D'ALERTE
+
 ## 📋 Table des Matières
 1. [Architecture & Stack](#architecture--stack)
 2. [🚨 RÈGLES CRITIQUES](#-règles-critiques)
@@ -38,6 +55,20 @@ src/
 // ✅ OBLIGATOIRE dans toute création WatermelonDB
 step._setRaw('id', apiStep._id); // Première ligne TOUJOURS
 ```
+
+### 1.1. 🚨 CONVERSION OBJECTID MONGODB → STRING DANS JSON - RÈGLE CRITIQUE 🚨
+**PROBLÈME** : Les ObjectIds MongoDB sont des objets, mais les accommodations/activities dans WatermelonDB sont stockées en JSON avec des IDs string
+**SOLUTION** : TOUJOURS convertir en string lors de la comparaison d'IDs dans les données JSON stockées
+```typescript
+// ❌ INCORRECT - Comparaison directe d'ObjectId vs string
+const targetAccommodation = accommodations.find((acc: any) => acc._id === accommodationId);
+
+// ✅ CORRECT - Conversion en string pour comparaison
+const targetAccommodation = accommodations.find((acc: any) => 
+  (acc._id?.toString() || acc._id) === accommodationId
+);
+```
+**CONTEXTE** : Dans WatermelonDB, les données complexes (accommodations, activities) sont stockées en JSON avec des ObjectIds MongoDB qui deviennent des objets. Pour les retrouver avec un ID string, il faut TOUJOURS convertir en string avant comparaison.
 
 ### 2. Dates et Fuseaux Horaires
 **PROBLÈME** : `Intl.DateTimeFormat` applique automatiquement le fuseau local
@@ -820,7 +851,7 @@ useFocusEffect(() => {
 ### 7. Bonnes Pratiques Générales
 - Garder le code propre et bien organisé pour faciliter les optimisations
 - Écrire des tests de performance pour détecter les régressions
-- Documenter les décisions d'optimisation pour la maintenance future
+- Ne pas documenter les features fonctionnelles et techniques dans un fichier .MD
 
 ## 🔄 SYSTÈME DE RAFRAÎCHISSEMENT COORDONNÉ - SOLUTION VALIDÉE 🔄
 

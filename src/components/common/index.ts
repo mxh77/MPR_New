@@ -12,6 +12,7 @@ export { default as AddressInput } from './AddressInput';
 export { default as ThumbnailPicker } from './ThumbnailPicker';
 export { default as GoogleMap } from './GoogleMap';
 export { default as StepListWithMap } from './StepListWithMap';
+export { CustomDateTimeRow } from './CustomDateTimeRow';
 
 // Types
 export type { ButtonProps } from './Button';
