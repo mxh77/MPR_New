@@ -10,7 +10,8 @@
 5. [🆔 GESTION DES IDS CRITIQUES](#️-gestion-des-ids-mongodb--watermelondb---règles-critiques-️)
 6. [📊 MONGODB RÉFÉRENCE](#-schémas-mongodb---référence-obligatoire)
 7. [⚡ OPTIMISATION PERFORMANCE](#️-optimisation-performance---règles-critiques-️)
-8. [Patterns Spécifiques](#patterns-darchitecture-spécifiques)
+8. [🔄 RAFRAÎCHISSEMENT COORDONNÉ](#️-système-de-rafraîchissement-coordonné---solution-validée-️)
+9. [Patterns Spécifiques](#patterns-darchitecture-spécifiques)
 
 ---
 
@@ -653,3 +654,195 @@ useFocusEffect(() => {
 - Garder le code propre et bien organisé pour faciliter les optimisations
 - Écrire des tests de performance pour détecter les régressions
 - Documenter les décisions d'optimisation pour la maintenance future
+
+## 🔄 SYSTÈME DE RAFRAÎCHISSEMENT COORDONNÉ - SOLUTION VALIDÉE 🔄
+
+### Problème Résolu : Boucles Infinies + Données Non Rafraîchies
+
+**Contexte** : Après sauvegarde dans EditStepScreen, les données n'étaient pas mises à jour dans StepDetailScreen et StepsListScreen. Les tentatives de rafraîchissement automatique créaient des boucles infinies.
+
+**Solution Implémentée** : Système de notification centralisé basé sur un timestamp + conditions strictes pour éviter les boucles infinies.
+
+### Architecture DataRefreshContext ✅
+
+#### 1. Contexte de Notification Centralisé
+```typescript
+// src/contexts/DataRefreshContext.tsx
+interface DataRefreshContextType {
+  lastStepUpdate: number;
+  notifyStepUpdate: (stepId: string) => void;
+}
+
+export const DataRefreshProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [lastStepUpdate, setLastStepUpdate] = useState(0);
+
+  const notifyStepUpdate = useCallback((stepId: string) => {
+    console.log('🔔 DataRefreshContext - Notification de mise à jour step:', stepId);
+    setLastStepUpdate(Date.now()); // Timestamp unique
+  }, []);
+
+  return (
+    <DataRefreshContext.Provider value={{ lastStepUpdate, notifyStepUpdate }}>
+      {children}
+    </DataRefreshContext.Provider>
+  );
+};
+```
+
+#### 2. Intégration dans App.tsx
+```typescript
+// App.tsx - Provider racine
+<DataRefreshProvider>
+  <AppNavigator />
+</DataRefreshProvider>
+```
+
+### Pattern d'Utilisation Standard ✅
+
+#### 1. Écran d'Édition (EditStepScreen)
+```typescript
+const EditStepScreen = () => {
+  const { notifyStepUpdate } = useDataRefresh();
+  
+  const handleSave = useCallback(async () => {
+    // ... logique de sauvegarde ...
+    
+    if (result) {
+      Alert.alert('Succès', 'Les modifications ont été sauvegardées', [{
+        text: 'OK',
+        onPress: () => {
+          // 1. Notifier le système qu'un step a été mis à jour
+          notifyStepUpdate(stepId);
+          
+          // 2. Rafraîchir les détails locaux
+          refreshStepDetail(true).then(() => {
+            // 3. Retourner à l'écran précédent
+            navigation.goBack();
+          });
+        }
+      }]);
+    }
+  }, [/* dépendances */]);
+};
+```
+
+#### 2. Écrans d'Affichage (StepDetailScreen + StepsListScreen)
+```typescript
+const StepDetailScreen = () => {
+  const { lastStepUpdate } = useDataRefresh();
+  
+  // Chargement initial - conditions strictes pour éviter boucles
+  useFocusEffect(
+    useCallback(() => {
+      if (!step && !loading && !syncing) {
+        fetchStepDetailRef.current();
+      }
+    }, [step, loading, syncing])
+  );
+  
+  // Écoute des notifications - SÉCURISÉ par timestamp
+  useEffect(() => {
+    if (lastStepUpdate > 0 && step && !loading && !syncing) {
+      console.log('🔔 StepDetailScreen - Notification reçue, rafraîchissement');
+      refreshStepDetail(true);
+    }
+  }, [lastStepUpdate]); // Dépendance UNIQUEMENT sur le timestamp
+};
+```
+
+### Règles de Sécurité Anti-Boucles Infinies ✅
+
+#### 1. Conditions Strictes Obligatoires
+```typescript
+// ✅ CORRECT - Conditions de protection
+if (lastStepUpdate > 0 && step && !loading && !syncing) {
+  refreshStepDetail(true);
+}
+
+// ❌ INCORRECT - Pas de conditions
+useEffect(() => {
+  refreshStepDetail(true); // Boucle infinie garantie !
+}, [lastStepUpdate]);
+```
+
+#### 2. Dépendances Minimales
+```typescript
+// ✅ CORRECT - Une seule dépendance
+useEffect(() => {
+  // logique de rafraîchissement
+}, [lastStepUpdate]); // UNIQUEMENT le timestamp
+
+// ❌ INCORRECT - Dépendances multiples qui changent
+useEffect(() => {
+  // logique de rafraîchissement
+}, [lastStepUpdate, step, refreshFunction]); // refreshFunction change → boucle
+```
+
+#### 3. Séparation des Responsabilités
+```typescript
+// ✅ CORRECT - Responsabilités séparées
+// useFocusEffect = chargement initial SEULEMENT
+// useEffect(lastStepUpdate) = rafraîchissement sur notification SEULEMENT
+
+// ❌ INCORRECT - Mélanger les responsabilités
+useFocusEffect(() => {
+  if (lastStepUpdate > 0) {
+    refreshData(); // Mélange chargement initial + notification
+  }
+});
+```
+
+### Avantages de cette Solution ✅
+
+#### 1. **Performance Optimisée**
+- Rafraîchissement uniquement quand nécessaire
+- Pas de polling ou vérifications constantes
+- Conditions strictes empêchent les appels multiples
+
+#### 2. **Sécurité Anti-Boucles**
+- Timestamp unique comme déclencheur
+- Dépendances minimales dans useEffect
+- Séparation claire des responsabilités
+
+#### 3. **Scalabilité**
+- Réutilisable pour d'autres entités (roadtrips, activities...)
+- Extensible : ajout de `notifyRoadtripUpdate()`, `notifyActivityUpdate()`
+- Contexte centralisé pour toute l'application
+
+#### 4. **Maintenance**
+- Code propre et bien structuré
+- Logs de debug pour traçabilité
+- Pattern standardisé reproductible
+
+### Cas d'Usage Validés ✅
+
+1. **EditStepScreen** → sauvegarde → **notification** → **StepDetailScreen** + **StepsListScreen** se rafraîchissent automatiquement
+2. **Navigation fluide** : EditStep → StepDetail → StepsList sans boucles infinies
+3. **Données toujours à jour** : modifications visibles immédiatement après sauvegarde
+4. **Performance préservée** : pas de re-renders excessifs ou d'appels API inutiles
+
+### Pattern de Debug Recommandé ✅
+
+```typescript
+// Logging standardisé pour traçabilité
+console.log('🔔 [Écran] - Notification reçue:', {
+  lastStepUpdate,
+  hasData: !!data,
+  loading,
+  syncing,
+  action: 'rafraîchissement déclenché'
+});
+```
+
+### Checklist d'Implémentation ✅
+
+1. ✅ **DataRefreshProvider** ajouté dans App.tsx
+2. ✅ **useDataRefresh()** importé dans les écrans concernés
+3. ✅ **notifyStepUpdate()** appelé après sauvegarde
+4. ✅ **useEffect(lastStepUpdate)** dans les écrans d'affichage
+5. ✅ **Conditions strictes** pour éviter boucles infinies
+6. ✅ **Dépendances minimales** dans tous les useEffect/useCallback
+7. ✅ **Tests de navigation** multiples sans appels en double
+8. ✅ **Logs de debug** pour traçabilité
+
+**🎯 RÉSULTAT** : Solution production-ready, scalable et maintenable pour la synchronisation des données sans boucles infinies.
