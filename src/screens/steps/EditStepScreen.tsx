@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { useTheme } from '../../contexts';
+import { useTheme, useDataRefresh } from '../../contexts';
 import { useStepDetail } from '../../hooks/useStepDetail';
 import { useStepUpdate } from '../../hooks/useStepUpdate';
 import type { Step } from '../../types';
@@ -208,6 +208,7 @@ interface RouteParams {
 
 const EditStepScreen: React.FC = () => {
   const { theme } = useTheme();
+  const { notifyStepUpdate } = useDataRefresh();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<EditStepScreenNavigationProp>();
   const route = useRoute();
@@ -365,13 +366,16 @@ const EditStepScreen: React.FC = () => {
             {
               text: 'OK',
               onPress: () => {
-                // Stratégie de rafraîchissement agressive pour s'assurer que tous les écrans sont à jour
+                // Stratégie de rafraîchissement coordonnée avec notification
                 console.log('🔄 EditStepScreen - Début rafraîchissement post-sauvegarde');
                 
-                // 1. Forcer le rafraîchissement des détails de l'étape
+                // 1. Notifier le système qu'un step a été mis à jour
+                notifyStepUpdate(stepId);
+                
+                // 2. Forcer le rafraîchissement des détails de l'étape
                 refreshStepDetail(true).then(() => {
                   console.log('✅ EditStepScreen - Rafraîchissement step detail terminé');
-                  // 2. Retourner à l'écran précédent après le refresh
+                  // 3. Retourner à l'écran précédent après le refresh
                   navigation.goBack();
                 }).catch(err => {
                   console.warn('⚠️ EditStepScreen - Erreur rafraîchissement step detail:', err);
@@ -396,7 +400,7 @@ const EditStepScreen: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [saving, updating, updateStepData, updateError, refreshStepDetail, navigation, stepId]); // Retirer 'step' des dépendances
+  }, [saving, updating, updateStepData, updateError, refreshStepDetail, navigation, stepId, notifyStepUpdate]); // Ajouter notifyStepUpdate
 
   /**
    * Gestion des champs de texte optimisée - Version finale
@@ -571,17 +575,6 @@ const EditStepScreen: React.FC = () => {
             styles={styles}
           />
 
-          {/* Notes */}
-          <CustomTextInput
-            label="Notes"
-            value={formData.notes}
-            onChangeText={handleNotesChange}
-            placeholder="Ajoutez des notes ou descriptions..."
-            multiline
-            icon="document-text"
-            styles={styles}
-          />
-
           {/* Date et heure d'arrivée */}
           <CustomDateTimeRow
             label="Arrivée"
@@ -601,6 +594,17 @@ const EditStepScreen: React.FC = () => {
             onDateChange={handleDepartureDateChange}
             onTimeChange={handleDepartureTimeChange}
             icon="calendar-outline"
+            styles={styles}
+          />
+
+          {/* Notes */}
+          <CustomTextInput
+            label="Notes"
+            value={formData.notes}
+            onChangeText={handleNotesChange}
+            placeholder="Ajoutez des notes ou descriptions..."
+            multiline
+            icon="document-text"
             styles={styles}
           />
 

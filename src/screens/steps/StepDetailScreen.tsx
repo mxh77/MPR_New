@@ -22,7 +22,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 
-import { useTheme } from '../../contexts';
+import { useTheme, useDataRefresh } from '../../contexts';
 import { useStepDetail } from '../../hooks/useStepDetail';
 import type { Step } from '../../types';
 import type { ApiStep } from '../../services/api/roadtrips';
@@ -47,6 +47,7 @@ interface TabRoute {
 
 const StepDetailScreen: React.FC = () => {
   const { theme } = useTheme();
+  const { lastStepUpdate } = useDataRefresh();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StepDetailScreenNavigationProp>();
   const route = useRoute();
@@ -176,6 +177,17 @@ const StepDetailScreen: React.FC = () => {
       }
     }, [step, loading, syncing]) // Dépendances minimales
   );
+
+  /**
+   * Effet pour écouter les notifications de mise à jour
+   * ✅ SÉCURISÉ: Utilise un timestamp pour éviter les boucles infinies
+   */
+  useEffect(() => {
+    if (lastStepUpdate > 0 && step && !loading && !syncing) {
+      console.log('🔔 StepDetailScreen - Notification de mise à jour reçue, rafraîchissement');
+      refreshStepDetail(true);
+    }
+  }, [lastStepUpdate]); // Dépendance uniquement sur le timestamp
 
   /**
    * Navigation vers l'édition

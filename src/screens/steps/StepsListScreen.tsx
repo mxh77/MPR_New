@@ -2,7 +2,7 @@
  * Écran de liste des étapes d'un roadtrip
  * Support offline-first avec synchronisation automatique
  */
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { useTheme } from '../../contexts';
+import { useTheme, useDataRefresh } from '../../contexts';
 import { useSteps } from '../../hooks/useSteps';
 import type { Step, StepType } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
@@ -40,6 +40,7 @@ interface RouteParams {
 
 const StepsListScreen: React.FC = () => {
   const { theme } = useTheme();
+  const { lastStepUpdate } = useDataRefresh();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StepsListScreenNavigationProp>();
   const route = useRoute();
@@ -83,6 +84,17 @@ const StepsListScreen: React.FC = () => {
       }
     }, [steps.length, loading, roadtripId, route.params])
   );
+
+  /**
+   * Effet pour écouter les notifications de mise à jour
+   * ✅ SÉCURISÉ: Utilise un timestamp pour éviter les boucles infinies
+   */
+  useEffect(() => {
+    if (lastStepUpdate > 0 && steps.length > 0 && !loading) {
+      console.log('🔔 StepsListScreen - Notification de mise à jour reçue, rafraîchissement');
+      refreshSteps(true);
+    }
+  }, [lastStepUpdate]); // Dépendance uniquement sur le timestamp
 
   const handleRefresh = async () => {
     setRefreshing(true);
