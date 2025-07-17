@@ -24,21 +24,21 @@ const { width: screenWidth } = Dimensions.get('window');
 const getMarkerStyle = (type?: string) => {
   switch (type) {
     case 'step':
-      return { icon: 'flag', color: '#2196F3' }; // Bleu - Drapeau pour step principal
+      return { icon: 'flag', color: '#c02f2fff' }; // Drapeau pour step principal
     case 'accommodation':
-      return { icon: 'bed', color: '#4CAF50' }; // Vert - Lit pour hébergement
+      return { icon: 'bed', color: '#677267ff' }; // Lit
     case 'hiking':
-      return { icon: 'walk', color: '#FF5722' }; // Rouge-orange - Randonneur
+      return { icon: 'walk', color: '#4CAF50' }; // Randonneur
     case 'visit':
-      return { icon: 'camera', color: '#9C27B0' }; // Violet
+      return { icon: 'camera', color: '#9C27B0' }; // Appareil photo
     case 'restaurant':
-      return { icon: 'restaurant', color: '#FF9800' }; // Orange
+      return { icon: 'restaurant', color: '#FF9800' }; // Restaurant
     case 'transport':
-      return { icon: 'car', color: '#607D8B' }; // Gris-bleu - Voiture
+      return { icon: 'car', color: '#1db3fdff' }; // Voiture
     case 'courses':
-      return { icon: 'basket', color: '#795548' }; // Marron - Chariot/panier pour courses
+      return { icon: 'basket', color: '#795548' }; // Chariot
     case 'activity':
-      return { icon: 'star', color: '#FF9800' }; // Orange - Étoile pour activité générique
+      return { icon: 'star', color: '#FF9800' }; // Etoile
     default:
       return { icon: 'location', color: '#FF9800' }; // Orange par défaut - Pin de localisation
   }

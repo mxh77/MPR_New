@@ -126,11 +126,32 @@ const convertStepModelToStep = (stepModel: StepModel): Step => {
   }
 
   try {
+    console.log('🔍 convertStepModelToStep - thumbnail avant parsing:', {
+      stepId: stepModel.id,
+      stepName: stepModel.name,
+      thumbnailRaw: stepModel.thumbnail,
+      thumbnailType: typeof stepModel.thumbnail,
+      thumbnailLength: stepModel.thumbnail?.length
+    });
+    
     thumbnail = stepModel.thumbnail ? JSON.parse(stepModel.thumbnail) : null;
+    
+    console.log('🔍 convertStepModelToStep - thumbnail après parsing:', {
+      stepId: stepModel.id,
+      thumbnail,
+      thumbnailType: typeof thumbnail,
+      hasUrl: thumbnail?.url
+    });
   } catch (e) {
     console.warn('Erreur parsing thumbnail:', e);
     // Si c'est une string, la garder telle quelle
     thumbnail = typeof stepModel.thumbnail === 'string' ? stepModel.thumbnail : null;
+    
+    console.log('🔍 convertStepModelToStep - thumbnail fallback:', {
+      stepId: stepModel.id,
+      thumbnail,
+      thumbnailType: typeof thumbnail
+    });
   }
 
   const step = {

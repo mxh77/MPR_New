@@ -94,6 +94,8 @@ const CustomDateTimeRow = React.memo(({
   onDateChange,
   onTimeChange,
   icon,
+  disabled = false,
+  disabledMessage,
   styles
 }: {
   label: string;
@@ -102,9 +104,11 @@ const CustomDateTimeRow = React.memo(({
   onDateChange: (text: string) => void;
   onTimeChange: (text: string) => void;
   icon: keyof typeof Ionicons.glyphMap;
+  disabled?: boolean;
+  disabledMessage?: string;
   styles: any;
 }) => {
-  console.log('🔄 DEBUG - CustomDateTimeRow render:', { label, dateValue, timeValue });
+  console.log('🔄 DEBUG - CustomDateTimeRow render:', { label, dateValue, timeValue, disabled });
   
   // États pour les modales de sélection
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -143,41 +147,75 @@ const CustomDateTimeRow = React.memo(({
   return (
     <View style={styles.inputContainer}>
       <View style={styles.inputHeader}>
-        <Ionicons name={icon} size={20} color={colors.primary} />
-        <Text style={styles.inputLabel}>{label}</Text>
+        <Ionicons name={icon} size={20} color={disabled ? colors.gray500 : colors.primary} />
+        <Text style={[styles.inputLabel, disabled && styles.disabledLabel]}>{label}</Text>
+        {disabled && disabledMessage && (
+          <View style={styles.disabledInfoContainer}>
+            <Ionicons name="information-circle" size={16} color={colors.warning} />
+            <Text style={styles.disabledInfo}>{disabledMessage}</Text>
+          </View>
+        )}
       </View>
       <View style={styles.dateTimeRow}>
         {/* Champ Date */}
         <View style={styles.dateInputContainer}>
-          <Text style={styles.dateTimeSubLabel}>Date</Text>
+          <Text style={[styles.dateTimeSubLabel, disabled && styles.disabledLabel]}>Date</Text>
           <TouchableOpacity
-            style={[styles.textInput, styles.dateTimeInput, styles.dateTimeButton]}
-            onPress={() => setShowDatePicker(true)}
+            style={[
+              styles.textInput, 
+              styles.dateTimeInput, 
+              styles.dateTimeButton,
+              disabled && styles.disabledInput
+            ]}
+            onPress={() => !disabled && setShowDatePicker(true)}
+            disabled={disabled}
           >
-            <Text style={[styles.dateTimeButtonText, !dateValue && styles.placeholderText]}>
+            <Text style={[
+              styles.dateTimeButtonText, 
+              !dateValue && styles.placeholderText,
+              disabled && styles.disabledText
+            ]}>
               {dateValue || 'YYYY-MM-DD'}
             </Text>
-            <Ionicons name="calendar-outline" size={16} color={colors.gray500} />
+            <Ionicons 
+              name="calendar-outline" 
+              size={16} 
+              color={disabled ? colors.gray400 : colors.gray500} 
+            />
           </TouchableOpacity>
         </View>
 
         {/* Champ Heure */}
         <View style={styles.timeInputContainer}>
-          <Text style={styles.dateTimeSubLabel}>Heure</Text>
+          <Text style={[styles.dateTimeSubLabel, disabled && styles.disabledLabel]}>Heure</Text>
           <TouchableOpacity
-            style={[styles.textInput, styles.dateTimeInput, styles.dateTimeButton]}
-            onPress={() => setShowTimePicker(true)}
+            style={[
+              styles.textInput, 
+              styles.dateTimeInput, 
+              styles.dateTimeButton,
+              disabled && styles.disabledInput
+            ]}
+            onPress={() => !disabled && setShowTimePicker(true)}
+            disabled={disabled}
           >
-            <Text style={[styles.dateTimeButtonText, !timeValue && styles.placeholderText]}>
+            <Text style={[
+              styles.dateTimeButtonText, 
+              !timeValue && styles.placeholderText,
+              disabled && styles.disabledText
+            ]}>
               {timeValue || 'HH:MM'}
             </Text>
-            <Ionicons name="time-outline" size={16} color={colors.gray500} />
+            <Ionicons 
+              name="time-outline" 
+              size={16} 
+              color={disabled ? colors.gray400 : colors.gray500} 
+            />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* DatePicker Modal */}
-      {showDatePicker && (
+      {/* DatePicker Modal - seulement si pas désactivé */}
+      {showDatePicker && !disabled && (
         <DateTimePicker
           value={getDateObject()}
           mode="date"
@@ -186,8 +224,8 @@ const CustomDateTimeRow = React.memo(({
         />
       )}
 
-      {/* TimePicker Modal */}
-      {showTimePicker && (
+      {/* TimePicker Modal - seulement si pas désactivé */}
+      {showTimePicker && !disabled && (
         <DateTimePicker
           value={getDateObject()}
           mode="time"
@@ -327,6 +365,43 @@ const EditStepScreen: React.FC = () => {
   }, [step]);
 
   /**
+   * Vérifie si l'étape a des activités ou hébergements avec des dates définies
+   * Si c'est le cas, les dates de l'étape sont calculées automatiquement par le backend
+   */
+  const hasActivitiesOrAccommodationsWithDates = useCallback(() => {
+    if (!step) return false;
+
+    const stepData = step as any;
+
+    // Vérifier les activités
+    const activities = Array.isArray(stepData.activities) ? stepData.activities : [];
+    const hasActivitiesWithDates = activities.some((activity: any) => 
+      activity && (activity.startDateTime || activity.endDateTime || activity.arrivalDateTime || activity.departureDateTime)
+    );
+
+    // Vérifier les hébergements
+    const accommodations = Array.isArray(stepData.accommodations) ? stepData.accommodations : [];
+    const hasAccommodationsWithDates = accommodations.some((accommodation: any) => 
+      accommodation && (accommodation.startDateTime || accommodation.endDateTime || accommodation.arrivalDateTime || accommodation.departureDateTime)
+    );
+
+    const result = hasActivitiesWithDates || hasAccommodationsWithDates;
+    
+    console.log('📅 EditStepScreen - Vérification dates automatiques:', {
+      activitiesCount: activities.length,
+      accommodationsCount: accommodations.length,
+      hasActivitiesWithDates,
+      hasAccommodationsWithDates,
+      datesAreAutoCalculated: result
+    });
+
+    return result;
+  }, [step]);
+
+  // Variables pour l'interface utilisateur
+  const datesAreAutoCalculated = hasActivitiesOrAccommodationsWithDates();
+
+  /**
    * Sauvegarde des modifications - OFFLINE-FIRST
    * Sauvegarde immédiate en local, synchronisation API en arrière-plan
    */
@@ -343,16 +418,26 @@ const EditStepScreen: React.FC = () => {
     setSaving(true);
 
     try {
-      // Reconstruction des dates complètes
+      // Reconstruction des dates complètes - SEULEMENT si pas de calcul automatique
       let arrivalDateTime: string | undefined;
       let departureDateTime: string | undefined;
 
-      if (currentFormData.arrivalDate && currentFormData.arrivalTime) {
-        arrivalDateTime = `${currentFormData.arrivalDate}T${currentFormData.arrivalTime}:00.000Z`;
-      }
+      // Si les dates ne sont PAS calculées automatiquement par le backend
+      if (!datesAreAutoCalculated) {
+        if (currentFormData.arrivalDate && currentFormData.arrivalTime) {
+          arrivalDateTime = `${currentFormData.arrivalDate}T${currentFormData.arrivalTime}:00.000Z`;
+        }
 
-      if (currentFormData.departureDate && currentFormData.departureTime) {
-        departureDateTime = `${currentFormData.departureDate}T${currentFormData.departureTime}:00.000Z`;
+        if (currentFormData.departureDate && currentFormData.departureTime) {
+          departureDateTime = `${currentFormData.departureDate}T${currentFormData.departureTime}:00.000Z`;
+        }
+        
+        console.log('📅 EditStepScreen - Dates manuelles construites:', {
+          arrivalDateTime,
+          departureDateTime
+        });
+      } else {
+        console.log('📅 EditStepScreen - Dates ignorées (calcul automatique par le backend)');
       }
 
       const updatedData = {
@@ -362,8 +447,8 @@ const EditStepScreen: React.FC = () => {
         latitude: currentFormData.latitude,
         longitude: currentFormData.longitude,
         thumbnail: currentFormData.thumbnail,
-        arrivalDateTime,
-        departureDateTime,
+        // Inclure les dates SEULEMENT si elles ne sont pas calculées automatiquement
+        ...(datesAreAutoCalculated ? {} : { arrivalDateTime, departureDateTime }),
       };
 
       console.log('💾 EditStepScreen - Sauvegarde offline-first:', updatedData);
@@ -705,6 +790,8 @@ const EditStepScreen: React.FC = () => {
             onDateChange={handleArrivalDateChange}
             onTimeChange={handleArrivalTimeChange}
             icon="calendar"
+            disabled={datesAreAutoCalculated}
+            disabledMessage={datesAreAutoCalculated ? "Calculées automatiquement" : undefined}
             styles={styles}
           />
 
@@ -716,6 +803,8 @@ const EditStepScreen: React.FC = () => {
             onDateChange={handleDepartureDateChange}
             onTimeChange={handleDepartureTimeChange}
             icon="calendar-outline"
+            disabled={datesAreAutoCalculated}
+            disabledMessage={datesAreAutoCalculated ? "Calculées automatiquement" : undefined}
             styles={styles}
           />
 
@@ -854,6 +943,32 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: colors.gray500,
+  },
+  // Styles pour les éléments désactivés
+  disabledLabel: {
+    color: colors.gray500,
+  },
+  disabledInput: {
+    backgroundColor: colors.gray100,
+    borderColor: colors.gray200,
+  },
+  disabledText: {
+    color: colors.gray400,
+  },
+  disabledInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: colors.warning + '20', // Warning color with 20% opacity
+    borderRadius: 8,
+  },
+  disabledInfo: {
+    fontSize: 12,
+    color: colors.warning,
+    marginLeft: 4,
+    fontWeight: '500',
   },
   loadingContainer: {
     flex: 1,

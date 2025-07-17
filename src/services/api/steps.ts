@@ -93,20 +93,33 @@ export const createStep = async (stepData: CreateStepRequest): Promise<ApiStep> 
 };
 
 /**
+ * Fonction utilitaire pour extraire l'URI d'un thumbnail
+ */
+const getThumbnailUri = (thumbnail: any): string | null => {
+  if (!thumbnail) return null;
+  if (typeof thumbnail === 'string') return thumbnail;
+  if (typeof thumbnail === 'object' && thumbnail.url) return thumbnail.url;
+  if (typeof thumbnail === 'object' && thumbnail.uri) return thumbnail.uri;
+  return null;
+};
+
+/**
  * Met à jour une étape avec support des fichiers
  */
 export const updateStep = async (stepId: string, stepData: UpdateStepRequest): Promise<ApiStep> => {
   try {
     console.log('🔧 updateStep - Début appel API:', { stepId, stepData });
     
+    // Extraire l'URI du thumbnail de manière sécurisée
+    const thumbnailUri = getThumbnailUri(stepData.thumbnail);
+    
     // Si thumbnail est présent et c'est un URI local, utiliser FormData
-    if (stepData.thumbnail && stepData.thumbnail.startsWith('file://')) {
+    if (thumbnailUri && thumbnailUri.startsWith('file://')) {
       console.log('📁 updateStep - Upload avec thumbnail fichier');
       
       const formData = new FormData();
       
       // Ajouter le fichier thumbnail
-      const thumbnailUri = stepData.thumbnail;
       const filename = thumbnailUri.split('/').pop() || 'thumbnail.jpg';
       const fileType = filename.split('.').pop()?.toLowerCase() || 'jpg';
       const mimeType = fileType === 'png' ? 'image/png' : 'image/jpeg';
@@ -136,7 +149,20 @@ export const updateStep = async (stepId: string, stepData: UpdateStepRequest): P
     } else {
       // Pas de fichier, utilisation JSON classique
       console.log('📝 updateStep - Mise à jour JSON classique');
-      const response: AxiosResponse<ApiStep> = await apiClient.put(`/steps/${stepId}`, stepData);
+      
+      // Préparer les données en convertissant thumbnail en string si nécessaire
+      const apiStepData = { ...stepData };
+      if (apiStepData.thumbnail) {
+        const thumbnailString = getThumbnailUri(apiStepData.thumbnail);
+        apiStepData.thumbnail = thumbnailString || undefined;
+      }
+      
+      console.log('📝 updateStep - Données préparées pour API:', {
+        thumbnail: apiStepData.thumbnail,
+        thumbnailType: typeof apiStepData.thumbnail
+      });
+      
+      const response: AxiosResponse<ApiStep> = await apiClient.put(`/steps/${stepId}`, apiStepData);
       
       console.log('🔧 updateStep - Réponse brute reçue:', {
         status: response.status,

@@ -21,8 +21,8 @@ import { Theme } from '../../constants/colors';
 interface ThumbnailPickerProps {
   /** Label du champ */
   label?: string;
-  /** URL ou URI de l'image actuelle */
-  value?: string | null;
+  /** URL ou URI de l'image actuelle - peut être string ou objet thumbnail */
+  value?: string | object | null;
   /** Callback appelé quand une image est sélectionnée */
   onImageSelected?: (imageUri: string) => void;
   /** Callback appelé quand l'image est supprimée */
@@ -140,6 +140,57 @@ export const ThumbnailPicker: React.FC<ThumbnailPickerProps> = ({
 }) => {
   const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
+
+  /**
+   * Fonction pour extraire l'URI de l'image depuis value (string ou objet thumbnail)
+   */
+  const getImageUri = (thumbnailValue: string | object | null): string | null => {
+    console.log('🖼️ ThumbnailPicker - getImageUri - value reçu:', {
+      type: typeof thumbnailValue,
+      value: thumbnailValue,
+      hasUrl: thumbnailValue && typeof thumbnailValue === 'object' && (thumbnailValue as any).url,
+      isString: typeof thumbnailValue === 'string'
+    });
+    
+    if (!thumbnailValue) {
+      return null;
+    }
+    
+    // Si c'est déjà une chaîne valide
+    if (typeof thumbnailValue === 'string' && thumbnailValue.trim().length > 0) {
+      const uri = thumbnailValue.trim();
+      console.log('🖼️ ThumbnailPicker - getImageUri - string:', uri);
+      return uri;
+    }
+    
+    // Si c'est un objet avec une propriété url (structure API)
+    if (typeof thumbnailValue === 'object' && thumbnailValue !== null) {
+      const thumbnail = thumbnailValue as any;
+      if (thumbnail.url && typeof thumbnail.url === 'string' && thumbnail.url.trim().length > 0) {
+        const uri = thumbnail.url.trim();
+        console.log('🖼️ ThumbnailPicker - getImageUri - object.url:', uri);
+        return uri;
+      }
+      
+      // Fallback: si c'est un objet avec une propriété uri
+      if (thumbnail.uri && typeof thumbnail.uri === 'string' && thumbnail.uri.trim().length > 0) {
+        const uri = thumbnail.uri.trim();
+        console.log('🖼️ ThumbnailPicker - getImageUri - object.uri:', uri);
+        return uri;
+      }
+      
+      console.warn('🖼️ ThumbnailPicker - getImageUri - Objet thumbnail sans url/uri:', {
+        keys: Object.keys(thumbnail),
+        thumbnail
+      });
+    }
+    
+    console.log('🖼️ ThumbnailPicker - getImageUri - Aucun format reconnu');
+    return null;
+  };
+
+  // Obtenir l'URI de l'image actuelle
+  const currentImageUri = getImageUri(value ?? null);
 
   // Demander les permissions si nécessaire
   const requestPermissions = async (type: 'camera' | 'library') => {
@@ -304,14 +355,14 @@ export const ThumbnailPicker: React.FC<ThumbnailPickerProps> = ({
       <ThumbnailContainer>
         {/* Zone principale d'affichage/sélection */}
         <ThumbnailButton
-          hasImage={!!value}
+          hasImage={!!currentImageUri}
           onPress={disabled ? undefined : showImageOptions}
           disabled={disabled || isLoading}
           activeOpacity={0.7}
         >
-          {value ? (
+          {currentImageUri ? (
             <>
-              <ThumbnailImage source={{ uri: value }} />
+              <ThumbnailImage source={{ uri: currentImageUri }} />
               {/* Bouton supprimer sur l'image */}
               <ActionButton
                 onPress={removeImage}
@@ -336,7 +387,7 @@ export const ThumbnailPicker: React.FC<ThumbnailPickerProps> = ({
         </ThumbnailButton>
 
         {/* Actions en bas */}
-        {!value && (
+        {!currentImageUri && (
           <BottomActions>
             <BottomButton
               onPress={openCamera}

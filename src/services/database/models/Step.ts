@@ -85,7 +85,7 @@ export default class Step extends BaseModel {
       }
       
       // Désérialisation de la thumbnail si c'est un JSON
-      if (this.thumbnail && this.thumbnail.startsWith('{')) {
+      if (this.thumbnail && typeof this.thumbnail === 'string' && this.thumbnail.startsWith('{')) {
         try {
           thumbnailProcessed = JSON.parse(this.thumbnail);
         } catch (e) {

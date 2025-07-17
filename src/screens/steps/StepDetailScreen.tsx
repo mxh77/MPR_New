@@ -15,6 +15,8 @@ import {
   Image,
   TouchableOpacity,
   Animated,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,7 +97,13 @@ const StepDetailScreen: React.FC = () => {
    * Fonction pour extraire l'URI de l'image depuis l'objet thumbnail
    */
   const getImageUri = (thumbnail: any): string | null => {
-    console.log('🖼️ StepDetailScreen - getImageUri - thumbnail reçu:', typeof thumbnail, thumbnail);
+    console.log('🖼️ StepDetailScreen - getImageUri - thumbnail reçu:', {
+      type: typeof thumbnail,
+      value: thumbnail,
+      hasUrl: thumbnail?.url,
+      hasUri: thumbnail?.uri,
+      isString: typeof thumbnail === 'string'
+    });
     
     if (!thumbnail) {
       console.log('🖼️ StepDetailScreen - getImageUri - thumbnail null/undefined');
@@ -104,26 +112,56 @@ const StepDetailScreen: React.FC = () => {
     
     // Si c'est déjà une chaîne valide
     if (typeof thumbnail === 'string' && thumbnail.trim().length > 0) {
-      console.log('🖼️ StepDetailScreen - getImageUri - string:', thumbnail);
-      return thumbnail.trim();
+      const uri = thumbnail.trim();
+      console.log('🖼️ StepDetailScreen - getImageUri - string:', uri);
+      return uri;
     }
     
-    // Si c'est un objet avec une propriété url (structure API)
+    // Si c'est un objet avec une propriété url (PRIORITÉ selon API)
     if (typeof thumbnail === 'object' && thumbnail !== null) {
+      // PRIORITÉ 1: thumbnail.url (selon API)
       if (thumbnail.url && typeof thumbnail.url === 'string' && thumbnail.url.trim().length > 0) {
-        console.log('🖼️ StepDetailScreen - getImageUri - object.url:', thumbnail.url);
-        return thumbnail.url.trim();
+        const uri = thumbnail.url.trim();
+        console.log('🖼️ StepDetailScreen - getImageUri - object.url (API):', uri);
+        return uri;
       }
       
-      // Si c'est un objet avec une propriété uri
+      // PRIORITÉ 2: thumbnail.uri (fallback)
       if (thumbnail.uri && typeof thumbnail.uri === 'string' && thumbnail.uri.trim().length > 0) {
-        console.log('🖼️ StepDetailScreen - getImageUri - object.uri:', thumbnail.uri);
-        return thumbnail.uri.trim();
+        const uri = thumbnail.uri.trim();
+        console.log('🖼️ StepDetailScreen - getImageUri - object.uri (fallback):', uri);
+        return uri;
       }
+      
+      // PRIORITÉ 3: Si l'objet a d'autres propriétés, les logger pour debug
+      console.warn('🖼️ StepDetailScreen - getImageUri - Objet thumbnail sans url/uri:', {
+        keys: Object.keys(thumbnail),
+        thumbnail
+      });
     }
     
     console.log('🖼️ StepDetailScreen - getImageUri - Aucun format reconnu pour:', thumbnail);
     return null;
+  };
+
+  /**
+   * Validation stricte de l'URI pour éviter les erreurs de casting
+   */
+  const isValidImageUri = (uri: any): uri is string => {
+    const isValid = typeof uri === 'string' && uri.length > 0 && (uri.startsWith('http') || uri.startsWith('file') || uri.startsWith('data:'));
+    
+    if (!isValid) {
+      console.warn('🖼️ URI invalide détectée:', {
+        uri,
+        type: typeof uri,
+        isString: typeof uri === 'string',
+        hasLength: uri?.length > 0,
+        startsWithHttp: uri?.startsWith?.('http'),
+        raw: JSON.stringify(uri)
+      });
+    }
+    
+    return isValid;
   };
 
   /**
@@ -135,9 +173,31 @@ const StepDetailScreen: React.FC = () => {
     placeholderIcon: keyof typeof Ionicons.glyphMap;
     onError?: (error: any) => void;
   }> = ({ thumbnail, style, placeholderIcon, onError }) => {
+    // Sécurité : si pas de thumbnail, retourner directement le placeholder
+    if (!thumbnail) {
+      console.log('🖼️ SafeImage - Pas de thumbnail, utilisation du placeholder');
+      return (
+        <View style={[style, styles.placeholderImage]}>
+          <Ionicons name={placeholderIcon} size={32} color={theme.colors.textSecondary} />
+        </View>
+      );
+    }
+
     const imageUri = getImageUri(thumbnail);
     
-    if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
+    console.log('🖼️ SafeImage - Debug:', {
+      thumbnail: typeof thumbnail,
+      imageUri: typeof imageUri,
+      imageUriValue: imageUri,
+      isValidImageUri: imageUri ? isValidImageUri(imageUri) : false
+    });
+    
+    // Triple validation pour éviter l'erreur de casting
+    if (imageUri && 
+        typeof imageUri === 'string' && 
+        imageUri.length > 0 && 
+        isValidImageUri(imageUri) &&
+        typeof imageUri !== 'object') { // Sécurité supplémentaire
       return (
         <Image
           source={{ uri: imageUri }}
@@ -150,6 +210,7 @@ const StepDetailScreen: React.FC = () => {
         />
       );
     } else {
+      console.log('🖼️ SafeImage - Utilisation du placeholder car URI invalide');
       return (
         <View style={[style, styles.placeholderImage]}>
           <Ionicons name={placeholderIcon} size={32} color={theme.colors.textSecondary} />
@@ -267,6 +328,53 @@ const StepDetailScreen: React.FC = () => {
     );
   }, [step]);
 
+  /**
+   * Menu contextuel pour les actions sur l'étape
+   */
+  const showActionMenu = useCallback(() => {
+    const options = ['Modifier', 'Supprimer', 'Annuler'];
+    const destructiveButtonIndex = 1; // Index du bouton "Supprimer"
+    const cancelButtonIndex = 2; // Index du bouton "Annuler"
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          destructiveButtonIndex,
+          cancelButtonIndex,
+          title: step?.title || 'Actions',
+          message: 'Que souhaitez-vous faire ?',
+        },
+        (buttonIndex) => {
+          switch (buttonIndex) {
+            case 0: // Modifier
+              handleEdit();
+              break;
+            case 1: // Supprimer
+              handleDelete();
+              break;
+            // case 2 est Annuler, ne fait rien
+          }
+        }
+      );
+    } else {
+      // Pour Android, utiliser Alert avec plusieurs boutons
+      Alert.alert(
+        step?.title || 'Actions',
+        'Que souhaitez-vous faire ?',
+        [
+          { text: 'Modifier', onPress: handleEdit },
+          { 
+            text: 'Supprimer', 
+            style: 'destructive', 
+            onPress: handleDelete 
+          },
+          { text: 'Annuler', style: 'cancel' }
+        ]
+      );
+    }
+  }, [step, handleEdit, handleDelete]);
+
   // SUPPRIMÉ: useEffect double qui causait la boucle infinie
   // Le useFocusEffect gère déjà le chargement initial
 
@@ -289,11 +397,12 @@ const StepDetailScreen: React.FC = () => {
     >
       {/* Informations principales */}
       <View style={[styles.infoCard, { backgroundColor: theme.colors.surface }]}>
+        {/* Titre simple sans actions */}
         <Text style={[styles.title, { color: theme.colors.text }]}>
           {step?.title || 'Titre non défini'}
         </Text>
         
-        {/* Thumbnail de l'étape intégré dans la card */}
+        {/* Thumbnail de l'étape avec menu d'actions */}
         {(() => {
           if (!step) return null;
           
@@ -301,17 +410,58 @@ const StepDetailScreen: React.FC = () => {
           
           if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
             return (
-              <Image
-                source={{ uri: imageUri }}
-                style={styles.stepThumbnail}
-                resizeMode="cover"
-                onError={(error) => {
-                  console.warn('🖼️ Erreur chargement thumbnail étape:', error.nativeEvent.error);
-                }}
-              />
+              <View style={styles.thumbnailContainer}>
+                {isValidImageUri(imageUri) ? (
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.stepThumbnail}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      console.warn('🖼️ Erreur chargement thumbnail étape:', error.nativeEvent.error, 'URI:', imageUri);
+                    }}
+                  />
+                ) : (
+                  <View style={[styles.stepThumbnail, styles.placeholderImage, { backgroundColor: '#f0f0f0' }]}>
+                    <Ionicons name="image-outline" size={32} color={theme.colors.textSecondary} />
+                    <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                      Image non valide
+                    </Text>
+                  </View>
+                )}
+                {/* Menu d'actions (3 points) */}
+                <TouchableOpacity 
+                  style={styles.thumbnailMenuButton}
+                  onPress={showActionMenu}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color="white" />
+                </TouchableOpacity>
+              </View>
+            );
+          } else {
+            return (
+              <View style={styles.thumbnailContainer}>
+                <TouchableOpacity 
+                  style={[styles.stepThumbnailPlaceholder, styles.placeholderImage]}
+                  onPress={handleEdit}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="camera" size={32} color={theme.colors.textSecondary} />
+                  <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                    Appuyer pour ajouter une photo
+                  </Text>
+                </TouchableOpacity>
+                {/* Menu d'actions pour placeholder */}
+                <TouchableOpacity 
+                  style={styles.thumbnailMenuButtonPlaceholder}
+                  onPress={showActionMenu}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             );
           }
-          return null;
         })()}
         
         {step?.location?.address && (
@@ -365,29 +515,6 @@ const StepDetailScreen: React.FC = () => {
             </Text>
           </View>
         )}
-
-        {/* Actions */}
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
-            onPress={handleEdit}
-          >
-            <Ionicons name="pencil" size={16} color={theme.colors.white} />
-            <Text style={[styles.actionButtonText, { color: theme.colors.white }]}>
-              Modifier
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.colors.danger }]}
-            onPress={handleDelete}
-          >
-            <Ionicons name="trash" size={16} color={theme.colors.white} />
-            <Text style={[styles.actionButtonText, { color: theme.colors.white }]}>
-              Supprimer
-            </Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </ScrollView>
   );
@@ -396,19 +523,32 @@ const StepDetailScreen: React.FC = () => {
    * Rendu de l'onglet Hébergements
    */
   const renderAccommodationsTab = () => {
-    const accommodations = step ? (step as any)?.accommodations || [] : [];
+    // Sécurité : vérifier que step existe et que accommodations est un array
+    const accommodations = step && Array.isArray((step as any)?.accommodations) 
+      ? (step as any).accommodations 
+      : [];
+    
+    console.log('🏨 Accommodations Debug:', {
+      stepExists: !!step,
+      accommodationsCount: accommodations.length,
+      accommodationsType: typeof accommodations
+    });
     
     return (
       <ScrollView style={styles.tabContent}>
         {accommodations.length > 0 ? (
-          accommodations.map((accommodation: any, index: number) => (
+          accommodations
+            .filter((accommodation: any) => accommodation && accommodation._id) // Filtrer les accommodations valides
+            .map((accommodation: any, index: number) => (
             <View key={accommodation._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
-              {/* Thumbnail de l'hébergement */}
-              <SafeImage 
-                thumbnail={accommodation.thumbnail}
-                style={styles.itemImage}
-                placeholderIcon="bed-outline"
-              />
+              {/* Thumbnail de l'hébergement - sécurisé */}
+              {accommodation && (
+                <SafeImage 
+                  thumbnail={accommodation.thumbnail || null}
+                  style={styles.itemImage}
+                  placeholderIcon="bed-outline"
+                />
+              )}
               
               <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
                 {accommodation.name || `Hébergement ${index + 1}`}
@@ -498,13 +638,23 @@ const StepDetailScreen: React.FC = () => {
    * Rendu de l'onglet Activités
    */
   const renderActivitiesTab = () => {
-    const activities = step ? (step as any)?.activities || [] : [];
+    // Sécurité : vérifier que step existe et que activities est un array
+    const activities = step && Array.isArray((step as any)?.activities) 
+      ? (step as any).activities 
+      : [];
+    
+    console.log('🎯 Activities Debug:', {
+      stepExists: !!step,
+      activitiesCount: activities.length,
+      activitiesType: typeof activities
+    });
     
     return (
       <ScrollView style={styles.tabContent}>
         {activities.length > 0 ? (
           // Tri : actives d'abord, puis par startDateTime croissant
           [...activities]
+        .filter((activity: any) => activity && activity._id) // Filtrer les activités valides
         .sort((a: any, b: any) => {
           // Actives d'abord
           if (a.active === b.active) {
@@ -517,12 +667,14 @@ const StepDetailScreen: React.FC = () => {
         })
         .map((activity: any, index: number) => (
           <View key={activity._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
-            {/* Thumbnail de l'activité */}
-            <SafeImage 
-              thumbnail={activity.thumbnail}
-              style={styles.itemImage}
-              placeholderIcon="walk-outline"
-            />
+            {/* Thumbnail de l'activité - sécurisé */}
+            {activity && (
+              <SafeImage 
+                thumbnail={activity.thumbnail || null}
+                style={styles.itemImage}
+                placeholderIcon="walk-outline"
+              />
+            )}
             
             <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
           {activity.name || `Activité ${index + 1}`}
@@ -674,13 +826,6 @@ const StepDetailScreen: React.FC = () => {
             {step?.type === 'Stage' ? 'Étape' : 'Arrêt'}
           </Text>
         </View>
-        
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={handleEdit}
-        >
-          <Ionicons name="pencil" size={20} color={theme.colors.white} />
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -741,7 +886,6 @@ const StepDetailScreen: React.FC = () => {
                 longitude: step.location.longitude,
                 title: step.title || 'Étape',
                 description: step.location.address,
-                color: '#2196F3', // Bleu pour l'étape principale
                 type: 'step' as const,
               },
               // Marqueurs pour les hébergements (lit vert)
@@ -753,7 +897,6 @@ const StepDetailScreen: React.FC = () => {
                   longitude: acc.longitude!,
                   title: acc.name || `Hébergement ${index + 1}`,
                   description: acc.address,
-                  color: '#4CAF50', // Vert pour hébergements
                   type: 'accommodation' as const,
                 })),
               // Marqueurs pour les activités (icônes selon type)
@@ -764,6 +907,11 @@ const StepDetailScreen: React.FC = () => {
                   let activityType = 'activity'; // par défaut
                   if (act.type) {
                     // Mapper les types d'activités aux types de marqueurs
+                    console.log('🗺️ Mapping type activité:', {
+                      originalType: act.type,
+                      normalizedType: act.type.toLowerCase()
+                    });
+                    
                     switch (act.type.toLowerCase()) {
                       case 'hiking':
                       case 'randonnée':
@@ -793,6 +941,11 @@ const StepDetailScreen: React.FC = () => {
                       default:
                         activityType = 'activity';
                     }
+                    
+                    console.log('🗺️ Type mapping result:', {
+                      originalType: act.type,
+                      mappedType: activityType
+                    });
                   }
                   
                   return {
@@ -801,7 +954,7 @@ const StepDetailScreen: React.FC = () => {
                     longitude: act.longitude!,
                     title: act.name || `Activité ${index + 1}`,
                     description: act.address,
-                    color: '#FF9800', // Orange pour activités
+                    // Pas de couleur fixe - laisser GoogleMap déterminer selon le type
                     type: activityType as any,
                   };
                 }),
@@ -817,10 +970,10 @@ const StepDetailScreen: React.FC = () => {
             
             return (
               <GoogleMap
-                title="Vue d'ensemble"
+                // title="Vue d'ensemble"
                 latitude={step.location.latitude}
                 longitude={step.location.longitude}
-                address={step.location.address}
+                // address={step.location.address}
                 height={250}
                 markers={markers}
                 showControls={true}
@@ -980,10 +1133,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholderText: {
-    fontSize: 14,
-    marginTop: 8,
-  },
 
   // Carte d'informations
   infoCard: {
@@ -1001,11 +1150,61 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
   },
+  thumbnailContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
   stepThumbnail: {
     width: '100%',
     height: 200,
     borderRadius: 12,
-    marginBottom: 16,
+  },
+  stepThumbnailPlaceholder: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    borderStyle: 'dashed',
+  },
+  thumbnailMenuButton: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbnailMenuButtonPlaceholder: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbnailOverlay: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: 'center',
   },
   addressRow: {
     flexDirection: 'row',
@@ -1045,24 +1244,6 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 16,
     lineHeight: 24,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    marginTop: 24,
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
 
   // Cartes d'éléments (activités/hébergements)
