@@ -59,6 +59,45 @@ if (!data && !loading && !syncing) { fetchData(); }
 **PROBLÈME** : Variables externes dans `database.write()`
 **SOLUTION** : Préparer TOUTES les données AVANT la closure + utiliser `_setRaw()`
 
+### 6. Sauvegarde Offline-First - RÈGLE GÉNÉRALE ⚡
+**PROBLÈME** : Sauvegarde lente avec attente API + UX dégradée
+**SOLUTION OBLIGATOIRE** : Pattern 2-phases pour TOUS les hooks de sauvegarde
+```typescript
+// ✅ PATTERN STANDARD pour tous les hooks de sauvegarde
+const updateData = useCallback(async (id: string, data: any) => {
+  // PHASE 1: Sauvegarde locale IMMÉDIATE (bloquante)
+  await database.write(async () => {
+    const item = await collection.find(id);
+    await item.update((record) => {
+      // Mise à jour des champs
+      record._setRaw('field', data.field);
+      // Marquer pour sync
+      record._setRaw('sync_status', 'pending');
+      record._setRaw('last_sync_at', null);
+      record._setRaw('updated_at', Date.now());
+    });
+  });
+  
+  // PHASE 2: Synchronisation API en arrière-plan (non-bloquante)
+  Promise.resolve().then(async () => {
+    try {
+      const apiResult = await updateAPI(id, data);
+      await updateLocalFromAPI(id, apiResult); // Sync des données complètes
+    } catch (apiError) {
+      console.warn('Sync API échouée, données locales conservées');
+    }
+  });
+  
+  // Retour immédiat après sauvegarde locale
+  return localResult;
+}, []);
+```
+**RÈGLES UX** :
+- ✅ Alert succès IMMÉDIAT après sauvegarde locale
+- ✅ Navigation instantanée sans attendre sync API
+- ✅ JAMAIS d'indicateur de synchronisation visible
+- ✅ Sync API totalement transparente en arrière-plan
+
 ## 🔧 SOLUTIONS VALIDÉES
 
 ### GooglePlacesInput - Autocomplétion d'Adresses
@@ -98,6 +137,16 @@ if (!data && !loading && !syncing) { fetchData(); }
 - Un seul point d'entrée chargement par écran
 - `React.memo` pour composants lourds
 
+### Sauvegarde Offline-First - Pattern Validé ⚡
+**PROBLÈME** : Expérience utilisateur dégradée avec attente sur appels API
+**SOLUTION** : Architecture 2-phases pour sauvegarde instantanée perçue
+- **useStepUpdate** implémentation de référence (EditStepScreen)
+- **PHASE 1** : Sauvegarde locale immédiate → Alert succès instantané
+- **PHASE 2** : Synchronisation API transparente en arrière-plan
+- **Gestion d'erreurs** : Données locales conservées si API échoue
+- **Marquage sync** : `sync_status='pending'` pour retry automatique
+- **UX optimale** : Navigation immédiate sans indicateur de sync visible
+
 ## 🎯 DEBUGGING PATTERNS
 
 ### Validation IDs Avant Appels API
@@ -119,6 +168,18 @@ console.log('🎯 Navigation:', { screen, params, hasValidId: isValidObjectId(pa
 ### Vérification Cache vs API
 ```typescript
 console.log('📍 Sync Decision:', { hasLocal: !!localData, isStale: lastSync < fiveMinAgo });
+```
+
+### Debug Sauvegarde Offline-First ⚡
+```typescript
+// Phase 1: Sauvegarde locale
+console.log('💾 PHASE 1: Sauvegarde locale immédiate');
+
+// Phase 2: Sync API arrière-plan
+console.log('🔄 PHASE 2: Sync API en arrière-plan');
+
+// Validation UX
+console.log('⚡ Retour immédiat après sauvegarde locale');
 ```
 
 ---
@@ -144,7 +205,7 @@ npx expo start --clear  # Vide cache + base WatermelonDB
 
 ---
 
-**🎯 PRINCIPE GÉNÉRAL** : Offline-first, ObjectIds préservés, conditions strictes, logs structurés
+**🎯 PRINCIPE GÉNÉRAL** : Offline-first, ObjectIds préservés, conditions strictes, logs structurés, sauvegarde locale immédiate
 
 ### Configuration Environnement (`src/config/index.ts`)
 - `ENV_CONFIG.DEBUG` conditionne API_BASE_URL debug/release
