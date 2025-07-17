@@ -325,7 +325,8 @@ const EditStepScreen: React.FC = () => {
   }, [step]);
 
   /**
-   * Sauvegarde des modifications
+   * Sauvegarde des modifications - OFFLINE-FIRST
+   * Sauvegarde immédiate en local, synchronisation API en arrière-plan
    */
   const handleSave = useCallback(async () => {
     if (saving || updating) return;
@@ -362,11 +363,15 @@ const EditStepScreen: React.FC = () => {
         departureDateTime,
       };
 
-      console.log('💾 EditStepScreen - Sauvegarde:', updatedData);
+      console.log('💾 EditStepScreen - Sauvegarde offline-first:', updatedData);
 
+      // Sauvegarde offline-first : immédiate en local, sync API en arrière-plan
       const result = await updateStepData(stepId, updatedData);
       
       if (result) {
+        // Succès immédiat après sauvegarde locale
+        console.log('✅ EditStepScreen - Sauvegarde locale réussie, affichage succès immédiat');
+        
         Alert.alert(
           'Succès',
           'Les modifications ont été sauvegardées',
@@ -374,28 +379,26 @@ const EditStepScreen: React.FC = () => {
             {
               text: 'OK',
               onPress: () => {
-                // Stratégie de rafraîchissement coordonnée avec notification
-                console.log('🔄 EditStepScreen - Début rafraîchissement post-sauvegarde');
+                console.log('🔄 EditStepScreen - Notification et retour immédiat');
                 
-                // 1. Notifier le système qu'un step a été mis à jour
+                // Notifier le système qu'un step a été mis à jour
                 notifyStepUpdate(stepId);
                 
-                // 2. Forcer le rafraîchissement des détails de l'étape
-                refreshStepDetail(true).then(() => {
-                  console.log('✅ EditStepScreen - Rafraîchissement step detail terminé');
-                  // 3. Retourner à l'écran précédent après le refresh
-                  navigation.goBack();
+                // Rafraîchir les données locales et retourner immédiatement
+                refreshStepDetail(false).then(() => {
+                  console.log('✅ EditStepScreen - Rafraîchissement local terminé');
                 }).catch(err => {
-                  console.warn('⚠️ EditStepScreen - Erreur rafraîchissement step detail:', err);
-                  // Même en cas d'erreur, retourner à l'écran précédent
-                  navigation.goBack();
+                  console.warn('⚠️ EditStepScreen - Erreur rafraîchissement mineur:', err);
                 });
+                
+                // Retourner immédiatement sans attendre la sync
+                navigation.goBack();
               }
             }
           ]
         );
       } else {
-        throw new Error('Aucune donnée retournée par l\'API');
+        throw new Error('Erreur lors de la sauvegarde locale');
       }
 
     } catch (err: any) {
@@ -408,7 +411,7 @@ const EditStepScreen: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [saving, updating, updateStepData, updateError, refreshStepDetail, navigation, stepId, notifyStepUpdate]); // Ajouter notifyStepUpdate
+  }, [saving, updating, updateStepData, updateError, refreshStepDetail, navigation, stepId, notifyStepUpdate]);
 
   /**
    * Gestion des champs de texte optimisée - Version finale
@@ -684,18 +687,6 @@ const EditStepScreen: React.FC = () => {
             styles={styles}
           />
 
-          {/* Indicateur de statut de synchronisation */}
-          <View style={styles.syncStatus}>
-            <Ionicons 
-              name={syncing ? "sync" : "checkmark-circle"} 
-              size={16} 
-              color={syncing ? colors.warning : colors.success} 
-            />
-            <Text style={styles.syncStatusText}>
-              {syncing ? 'Synchronisation...' : 'Données synchronisées'}
-            </Text>
-          </View>
-
           {/* Espace pour le bouton de sauvegarde sur iOS */}
           <View style={styles.bottomPadding} />
         </ScrollView>
@@ -820,22 +811,6 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: colors.gray500,
-  },
-  syncStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-  },
-  syncStatusText: {
-    fontSize: 14,
-    color: colors.gray600,
-    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,

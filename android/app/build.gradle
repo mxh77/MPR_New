@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.maxime.heron.monpetitroadtrip2.debug'
+    namespace 'com.maxime.heron.monpetitroadtrip2'
     defaultConfig {
-        applicationId 'com.maxime.heron.monpetitroadtrip2.debug'
+        applicationId 'com.maxime.heron.monpetitroadtrip2'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
