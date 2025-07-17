@@ -7,19 +7,15 @@ import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
+  ScrollView,
   StyleSheet,
-  Dimensions,
   TextInput,
-  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import styled from 'styled-components/native';
 import { useTheme } from '../../contexts';
 import ENV from '../../config/env';
 import { Theme } from '../../constants/colors';
-
-const { width } = Dimensions.get('window');
 
 interface GooglePlacesInputProps {
   /** Valeur actuelle du champ */
@@ -28,6 +24,8 @@ interface GooglePlacesInputProps {
   onChangeText: (text: string) => void;
   /** Callback appelé quand une suggestion est sélectionnée */
   onPlaceSelected?: (place: GooglePlacePrediction) => void;
+  /** Callback appelé quand le champ est vidé via le bouton de suppression */
+  onClear?: () => void;
   /** Placeholder du champ de saisie */
   placeholder?: string;
   /** Label du champ */
@@ -59,6 +57,7 @@ interface GooglePlacesResponse {
 // Styled Components
 const Container = styled.View`
   position: relative;
+  z-index: 1;
 `;
 
 const Label = styled.Text<{ theme: Theme }>`
@@ -71,9 +70,9 @@ const Label = styled.Text<{ theme: Theme }>`
 const InputContainer = styled.View<{ theme: Theme }>`
   position: relative;
   border-width: 1px;
-  border-color: ${props => props.theme.colors.border};
+  border-color: #D1D5DB;
   border-radius: 12px;
-  background-color: ${props => props.theme.colors.background};
+  background-color: #FFFFFF;
 `;
 
 const IconContainer = styled.View`
@@ -84,31 +83,41 @@ const IconContainer = styled.View`
   z-index: 1;
 `;
 
+const ClearButton = styled.TouchableOpacity<{ theme: Theme }>`
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-12px);
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  justify-content: center;
+  align-items: center;
+`;
+
 const StyledTextInput = styled(TextInput)<{ 
   hasIcon: boolean; 
+  hasClearButton: boolean;
   isFocused: boolean; 
   theme: Theme; 
 }>`
   height: 48px;
-  padding-horizontal: ${props => props.hasIcon ? '44px' : '16px'};
-  padding-vertical: 12px;
+  padding-left: ${props => props.hasIcon ? '44px' : '16px'};
+  padding-right: ${props => props.hasClearButton ? '44px' : '16px'};
+  padding-top: 12px;
+  padding-bottom: 12px;
   font-size: 16px;
-  color: ${props => props.theme.colors.text};
+  color: #1F2937;
   border-radius: 12px;
+  background-color: transparent;
   ${props => props.isFocused && `
     border-color: ${props.theme.colors.primary};
     border-width: 2px;
   `}
 `;
 
-const ModalOverlay = styled.TouchableOpacity`
-  flex: 1;
-  background-color: rgba(0, 0, 0, 0.1);
-`;
-
 const SuggestionsContainer = styled.View<{ theme: Theme }>`
-  position: absolute;
-  background-color: ${props => props.theme.colors.background};
+  background-color: #FFFFFF;
   border-radius: 12px;
   elevation: 8;
   shadow-color: #000;
@@ -116,7 +125,7 @@ const SuggestionsContainer = styled.View<{ theme: Theme }>`
   shadow-opacity: 0.3;
   shadow-radius: 8px;
   border-width: 1px;
-  border-color: ${props => props.theme.colors.border};
+  border-color: #D1D5DB;
   max-height: 300px;
   z-index: 9999;
 `;
@@ -126,7 +135,7 @@ const SuggestionItem = styled.TouchableOpacity<{ theme: Theme }>`
   align-items: center;
   padding: 16px;
   border-bottom-width: 1px;
-  border-bottom-color: ${props => props.theme.colors.border};
+  border-bottom-color: #D1D5DB;
 `;
 
 const SuggestionTextContainer = styled.View`
@@ -136,19 +145,20 @@ const SuggestionTextContainer = styled.View`
 const SuggestionMainText = styled.Text<{ theme: Theme }>`
   font-size: 16px;
   font-weight: 600;
-  color: ${props => props.theme.colors.text};
+  color: #1F2937;
   margin-bottom: 2px;
 `;
 
 const SuggestionSecondaryText = styled.Text<{ theme: Theme }>`
   font-size: 14px;
-  color: ${props => props.theme.colors.textSecondary};
+  color: #6B7280;
 `;
 
 export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
   value,
   onChangeText,
   onPlaceSelected,
+  onClear,
   placeholder = "Rechercher une adresse...",
   label,
   icon = "location-outline",
@@ -160,21 +170,11 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
   const [suggestions, setSuggestions] = useState<GooglePlacePrediction[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const [inputLayout, setInputLayout] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const inputRef = useRef<TextInput>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Couleur de l'icône par défaut basée sur le thème
   const finalIconColor = iconColor || theme.colors.primary;
-
-  // Fonction pour mesurer la position du champ de saisie
-  const measureInput = () => {
-    if (inputRef.current) {
-      inputRef.current.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
-        setInputLayout({ x: pageX, y: pageY, width, height });
-      });
-    }
-  };
 
   // Fonction pour récupérer les suggestions Google Places
   const fetchSuggestions = async (input: string) => {
@@ -198,7 +198,6 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
       if (data.status === 'OK' && data.predictions) {
         setSuggestions(data.predictions);
         setShowSuggestions(true);
-        measureInput(); // Mesurer la position pour le Modal
       } else {
         setSuggestions([]);
         setShowSuggestions(false);
@@ -237,16 +236,33 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
       onPlaceSelected(suggestion);
     }
     
-    // Retirer le focus
-    if (inputRef.current) {
-      inputRef.current.blur();
+    // NE PAS retirer le focus pour maintenir le clavier ouvert
+    // L'utilisateur peut continuer à taper après sélection
+  };
+
+  // Gérer la suppression du contenu
+  const handleClearText = () => {
+    console.log('🎯 DEBUG - Suppression du contenu adresse');
+    onChangeText('');
+    setShowSuggestions(false);
+    setSuggestions([]);
+    
+    // Appeler la callback de suppression si fournie
+    if (onClear) {
+      onClear();
     }
+    
+    // Remettre le focus sur le champ après suppression
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
   };
 
   // Gérer le focus
   const handleFocus = () => {
     setIsFocused(true);
-    measureInput();
     if (value.length >= 2) {
       fetchSuggestions(value);
     }
@@ -255,14 +271,15 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
   // Gérer la perte de focus
   const handleBlur = () => {
     setIsFocused(false);
-    // Délai pour permettre la sélection d'une suggestion
+    // Fermer immédiatement les suggestions quand on perd le focus
+    // (sauf si l'utilisateur clique sur une suggestion dans les 150ms)
     setTimeout(() => {
       setShowSuggestions(false);
       setSuggestions([]);
-    }, 200);
+    }, 150);
   };
 
-  // Nettoyer les timeouts
+  // Nettoyer les timeouts et fermer les suggestions si le composant perd le focus
   useEffect(() => {
     return () => {
       if (debounceTimeoutRef.current) {
@@ -271,25 +288,18 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
     };
   }, []);
 
-  // Rendu d'une suggestion
-  const renderSuggestion = ({ item }: { item: GooglePlacePrediction }) => (
-    <SuggestionItem theme={theme} onPress={() => handleSuggestionPress(item)} activeOpacity={0.7}>
-      <Ionicons 
-        name="location-outline" 
-        size={16} 
-        color={theme.colors.textSecondary} 
-        style={{ marginRight: 12 }} 
-      />
-      <SuggestionTextContainer>
-        <SuggestionMainText theme={theme} numberOfLines={1}>
-          {item.structured_formatting.main_text}
-        </SuggestionMainText>
-        <SuggestionSecondaryText theme={theme} numberOfLines={1}>
-          {item.structured_formatting.secondary_text}
-        </SuggestionSecondaryText>
-      </SuggestionTextContainer>
-    </SuggestionItem>
-  );
+  // Fermer les suggestions quand le composant n'est plus focusé
+  useEffect(() => {
+    if (!isFocused) {
+      // Délai court pour permettre la sélection d'une suggestion
+      const timer = setTimeout(() => {
+        setShowSuggestions(false);
+        setSuggestions([]);
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isFocused]);
 
   return (
     <Container style={style}>
@@ -298,7 +308,7 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
       
       <InputContainer theme={theme}>
         {/* Icône */}
-        {icon && (
+        {icon && icon !== '' && (
           <IconContainer>
             <Ionicons name={icon as any} size={20} color={finalIconColor} />
           </IconContainer>
@@ -313,39 +323,74 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
           onBlur={handleBlur}
           placeholder={placeholder}
           editable={!disabled}
-          hasIcon={!!icon}
+          hasIcon={!!(icon && icon !== '')}
+          hasClearButton={value.length > 0}
           isFocused={isFocused}
           theme={theme}
-          placeholderTextColor={theme.colors.textSecondary}
+          placeholderTextColor="#6B7280"
         />
+
+        {/* Bouton de suppression */}
+        {value.length > 0 && (
+          <ClearButton 
+            theme={theme}
+            onPress={handleClearText}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons 
+              name="close-circle" 
+              size={20} 
+              color="#6B7280" 
+            />
+          </ClearButton>
+        )}
       </InputContainer>
 
-      {/* Modal des suggestions */}
-      <Modal
-        visible={showSuggestions && suggestions.length > 0}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSuggestions(false)}
-      >
-        <ModalOverlay onPress={() => setShowSuggestions(false)}>
-          <SuggestionsContainer
-            theme={theme}
-            style={{
-              top: inputLayout.y + inputLayout.height + 8,
-              left: inputLayout.x,
-              width: inputLayout.width,
-            }}
+      {/* Suggestions directement dans la hiérarchie - SANS Modal */}
+      {showSuggestions && suggestions.length > 0 && (
+        <SuggestionsContainer
+          theme={theme}
+          style={{
+            position: 'absolute',
+            top: 56, // Hauteur approximative de l'input + padding
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+          }}
+        >
+          {/* Utiliser ScrollView avec map() au lieu de FlatList pour éviter l'erreur VirtualizedList */}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+            style={{ maxHeight: 300 }}
           >
-            <FlatList
-              data={suggestions}
-              keyExtractor={(item) => item.place_id}
-              renderItem={renderSuggestion}
-              keyboardShouldPersistTaps="always"
-              showsVerticalScrollIndicator={false}
-            />
-          </SuggestionsContainer>
-        </ModalOverlay>
-      </Modal>
+            {suggestions.map((item) => (
+              <SuggestionItem 
+                key={item.place_id}
+                theme={theme} 
+                onPress={() => handleSuggestionPress(item)} 
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name="location-outline" 
+                  size={16} 
+                  color="#6B7280" 
+                  style={{ marginRight: 12 }} 
+                />
+                <SuggestionTextContainer>
+                  <SuggestionMainText theme={theme} numberOfLines={1}>
+                    {item.structured_formatting.main_text}
+                  </SuggestionMainText>
+                  <SuggestionSecondaryText theme={theme} numberOfLines={1}>
+                    {item.structured_formatting.secondary_text}
+                  </SuggestionSecondaryText>
+                </SuggestionTextContainer>
+              </SuggestionItem>
+            ))}
+          </ScrollView>
+        </SuggestionsContainer>
+      )}
     </Container>
   );
 };

@@ -29,6 +29,8 @@ import type { Step } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { formatDateWithoutTimezone, parseISODate } from '../../utils';
 import { colors } from '../../constants/colors';
+import { GooglePlacesInput } from '../../components/common';
+import ENV from '../../config/env';
 
 // ==========================================
 // COMPOSANTS EXTRAITS POUR ÉVITER RE-RENDERS
@@ -236,6 +238,8 @@ const EditStepScreen: React.FC = () => {
     name: '',
     notes: '',
     address: '',
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
     arrivalDate: '',
     arrivalTime: '',
     departureDate: '',
@@ -310,6 +314,8 @@ const EditStepScreen: React.FC = () => {
         name: step.title || '',
         notes: step.description || '',
         address: step.location?.address || '',
+        latitude: step.location?.latitude,
+        longitude: step.location?.longitude,
         arrivalDate,
         arrivalTime,
         departureDate,
@@ -350,6 +356,8 @@ const EditStepScreen: React.FC = () => {
         name: currentFormData.name.trim(),
         notes: currentFormData.notes.trim(),
         address: currentFormData.address.trim(),
+        latitude: currentFormData.latitude,
+        longitude: currentFormData.longitude,
         arrivalDateTime,
         departureDateTime,
       };
@@ -454,6 +462,67 @@ const EditStepScreen: React.FC = () => {
   const handleDepartureTimeChange = React.useMemo(() => (text: string) => {
     console.log('🎯 DEBUG - handleDepartureTimeChange:', text);
     handleTextChangeRef.current('departureTime', text);
+  }, []);
+
+  // Fonction pour gérer la sélection d'un lieu Google Places
+  const handlePlaceSelected = useCallback(async (place: any) => {
+    console.log('🎯 DEBUG - Place sélectionné:', place);
+    
+    try {
+      // Récupérer les détails du lieu pour obtenir les coordonnées
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=geometry,formatted_address&key=${ENV.GOOGLE_API_KEY}`
+      );
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.result?.geometry?.location) {
+        const { lat, lng } = data.result.geometry.location;
+        const address = data.result.formatted_address || place.description;
+        
+        console.log('🎯 DEBUG - Coordonnées récupérées:', { lat, lng, address });
+        
+        // Mettre à jour le formData avec l'adresse et les coordonnées
+        setFormData(prev => ({
+          ...prev,
+          address,
+          latitude: lat,
+          longitude: lng
+        }));
+        
+        // Mettre à jour la ref pour handleSave
+        formDataRef.current = {
+          ...formDataRef.current,
+          address,
+          latitude: lat,
+          longitude: lng
+        };
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des détails du lieu:', error);
+      // En cas d'erreur, utiliser juste la description
+      handleAddressChange(place.description);
+    }
+  }, [handleAddressChange]);
+
+  // Fonction pour gérer la suppression de l'adresse et des coordonnées
+  const handleAddressClear = useCallback(() => {
+    console.log('🎯 DEBUG - Suppression adresse et coordonnées');
+    
+    // Vider l'adresse et les coordonnées
+    setFormData(prev => ({
+      ...prev,
+      address: '',
+      latitude: undefined,
+      longitude: undefined
+    }));
+    
+    // Mettre à jour la ref pour handleSave
+    formDataRef.current = {
+      ...formDataRef.current,
+      address: '',
+      latitude: undefined,
+      longitude: undefined
+    };
   }, []);
 
   // Debug pour les callbacks de champs (après définition)
@@ -565,15 +634,22 @@ const EditStepScreen: React.FC = () => {
             styles={styles}
           />
 
-          {/* Adresse */}
-          <CustomTextInput
-            label="Adresse"
-            value={formData.address}
-            onChangeText={handleAddressChange}
-            placeholder="Entrez l'adresse..."
-            icon="map"
-            styles={styles}
-          />
+          {/* Adresse avec autocomplétion Google */}
+          <View style={[styles.inputContainer, { zIndex: 1000 }]}>
+            <View style={styles.inputHeader}>
+              <Ionicons name="map" size={20} color={colors.primary} />
+              <Text style={styles.inputLabel}>Adresse</Text>
+            </View>
+            <GooglePlacesInput
+              value={formData.address}
+              onChangeText={handleAddressChange}
+              onPlaceSelected={handlePlaceSelected}
+              onClear={handleAddressClear}
+              placeholder="Rechercher une adresse..."
+              icon="" // Pas d'icône dans le champ lui-même
+              style={styles.googlePlacesContainer}
+            />
+          </View>
 
           {/* Date et heure d'arrivée */}
           <CustomDateTimeRow
@@ -706,6 +782,12 @@ const styles = StyleSheet.create({
     minHeight: 100,
     paddingTop: 12,
     textAlignVertical: 'top',
+  },
+  googlePlacesContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.gray300,
   },
   dateTimeRow: {
     flexDirection: 'row',

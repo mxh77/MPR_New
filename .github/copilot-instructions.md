@@ -3,51 +3,148 @@
 # Instructions Copilot pour Mon Petit Roadtrip v2
 
 ## 📋 Table des Matières
-1. [Contexte & Architecture](#contexte-du-projet)
-2. [Structure de Fichiers](#structure-de-fichiers-critique)
-3. [🚨 SCHÉMAS CRITIQUES](#️-schémas-de-données---règles-critiques-️)
-4. [Règles de Développement](#règles-de-développement-strictes)
-5. [🆔 GESTION DES IDS CRITIQUES](#️-gestion-des-ids-mongodb--watermelondb---règles-critiques-️)
-6. [📊 MONGODB RÉFÉRENCE](#-schémas-mongodb---référence-obligatoire)
-7. [⚡ OPTIMISATION PERFORMANCE](#️-optimisation-performance---règles-critiques-️)
-8. [🔄 RAFRAÎCHISSEMENT COORDONNÉ](#️-système-de-rafraîchissement-coordonné---solution-validée-️)
-9. [Patterns Spécifiques](#patterns-darchitecture-spécifiques)
+1. [Architecture & Stack](#architecture--stack)
+2. [🚨 RÈGLES CRITIQUES](#-règles-critiques)
+3. [🔧 SOLUTIONS VALIDÉES](#-solutions-validées)
+4. [� DEBUGGING PATTERNS](#-debugging-patterns)
 
 ---
 
-## Contexte du Projet
-Application React Native de planification de road trips avec architecture offline-first, utilisant WatermelonDB pour la persistance locale et synchronisation avec backend.
+## Architecture & Stack
 
-## Architecture et Stack Technique
-- **Framework**: React Native + Expo SDK 53.x *(actuellement installé)*
-- **Langage**: TypeScript strict exclusivement  
-- **Navigation**: React Navigation v7+ avec stack/tabs/material-top-tabs
-- **Base de données**: WatermelonDB (offline-first critique)
-- **HTTP**: Axios avec intercepteurs auth + retry logic
-- **Styling**: Styled-components + palette `src/constants/colors.ts`
-- **State**: Context API + useReducer (pas de Redux)
+### Stack Technique
+- **React Native + Expo SDK 53.x** avec TypeScript strict
+- **WatermelonDB** offline-first avec sync MongoDB (ObjectIds 24 chars)
+- **React Navigation v7+** pour navigation
+- **Context API** pour state management (pas Redux)
+- **Google Places API** pour autocomplétion d'adresses
 
-## Structure de Fichiers Critique
+### Structure Critique
 ```
 src/
-├── config/index.ts          # ENV_CONFIG, ALGOLIA_CONFIG, DATABASE_CONFIG
-├── constants/colors.ts      # Palette complète (primary:#007BFF, hiking:#FF5722)
-├── types/index.ts          # Types centralisés (ActivityType, StepType, etc.)
-├── services/               # Pattern Repository obligatoire
-│   ├── database/          # Setup WatermelonDB + modèles
-│   ├── api/               # Client Axios + endpoints sans /api/
-│   ├── auth/              # JWT + SecureStore
-│   └── sync/              # Queue optimiste + résolution conflits
-└── components/             # Composants réutilisables avec JSDoc
+├── contexts/               # Providers (Theme, Auth, Database, DataRefresh)
+├── hooks/                 # Business logic avec cache offline-first
+├── services/api/          # Endpoints sans /api/ + validation ObjectIds
+├── services/database/     # WatermelonDB models + migrations
+└── utils/                 # formatDateWithoutTimezone() obligatoire
 ```
 
-## Scripts de Développement Essentiels
-- `npm run start:clear` - Démarre avec cache vidé
-- `npm run android:debug` - Build debug Android natif
-- `npm run typecheck` - Validation TypeScript (obligatoire avant commit)
-- `npm run sync:database` - Script custom de synchronisation DB
+## 🚨 RÈGLES CRITIQUES
 
-## Patterns d'Architecture Spécifiques
+### 1. IDs MongoDB ↔ WatermelonDB
+**PROBLÈME** : WatermelonDB génère des IDs courts → "Cast to ObjectId failed"
+**SOLUTION** : TOUJOURS préserver ObjectIds MongoDB comme primary keys
+```typescript
+// ✅ OBLIGATOIRE dans toute création WatermelonDB
+step._setRaw('id', apiStep._id); // Première ligne TOUJOURS
+```
+
+### 2. Dates et Fuseaux Horaires
+**PROBLÈME** : `Intl.DateTimeFormat` applique automatiquement le fuseau local
+**SOLUTION** : Utiliser `formatDateWithoutTimezone()` depuis `src/utils/`
+
+### 3. Boucles Infinies useFocusEffect/useEffect
+**PROBLÈME** : Double chargement hook + écran
+**SOLUTION** : Conditions strictes + dépendances minimales
+```typescript
+// ✅ Pattern sécurisé
+if (!data && !loading && !syncing) { fetchData(); }
+```
+
+### 4. Sérialisation JSON WatermelonDB
+**PROBLÈME** : Objets complexes stockés directement
+**SOLUTION** : TOUJOURS `JSON.stringify()` avant stockage + validation après `JSON.parse()`
+
+### 5. Closure Variables WatermelonDB
+**PROBLÈME** : Variables externes dans `database.write()`
+**SOLUTION** : Préparer TOUTES les données AVANT la closure + utiliser `_setRaw()`
+
+## 🔧 SOLUTIONS VALIDÉES
+
+### GooglePlacesInput - Autocomplétion d'Adresses
+**PROBLÈME** : Saisie manuelle d'adresses sans validation/géolocalisation
+**SOLUTION** : Composant GooglePlacesInput avec API Google Places
+- `<GooglePlacesInput onPlaceSelected={handlePlaceSelected} />` remplace TextInput classique
+- `handlePlaceSelected` récupère automatiquement latitude/longitude via Place Details API
+- Stockage coordonnées dans `location: { latitude, longitude, address }`
+- Configuration : `EXPO_PUBLIC_GOOGLE_API_KEY` dans .env
+
+### DataRefreshContext - Rafraîchissement Sans Boucles
+**PROBLÈME** : Données non rafraîchies après sauvegarde + boucles infinies
+**SOLUTION** : Système notification centralisé par timestamp
+- `notifyStepUpdate(stepId)` dans EditScreen après sauvegarde
+- `useEffect(() => { refresh() }, [lastStepUpdate])` dans écrans d'affichage
+- Conditions strictes : `lastStepUpdate > 0 && data && !loading && !syncing`
+
+### Synchronisation Database Robuste
+**PROBLÈME** : UNIQUE constraint violations + données corrompues
+**SOLUTION** : Pattern update-or-create avec existingMap
+- Charger données existantes AVANT création
+- Utiliser `find()` pour vérifier existence puis `update()` ou `create()`
+- Préserver ObjectIds MongoDB en priorité absolue
+
+### Gestion Erreurs API
+**PROBLÈME** : Pas de fallback sur cache en cas d'erreur réseau
+**SOLUTION** : Stratégie offline-first systématique
+- Cache local → sync conditionnelle en arrière-plan
+- Fallback sur données locales si API échoue (sauf 404)
+- `shouldSynchronize()` avec validation fraîcheur (5min max)
+
+### Performance Hooks
+**PROBLÈME** : Re-renders excessifs + appels API multiples
+**SOLUTION** : Optimisations obligatoires
+- `useCallback` avec dépendances minimales
+- Éviter fonctions internes dans dépendances → intégrer logique directement
+- Un seul point d'entrée chargement par écran
+- `React.memo` pour composants lourds
+
+## 🎯 DEBUGGING PATTERNS
+
+### Validation IDs Avant Appels API
+```typescript
+const isValidObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
+if (!isValidObjectId(stepId)) { console.error('❌ ID invalide:', stepId); return; }
+```
+
+### Logs Structurés pour Sync
+```typescript
+console.log('🔧 [Hook] - Phase:', { itemCount: data.length, sampleId: data[0]?._id });
+```
+
+### Debug Navigation Paramètres
+```typescript
+console.log('🎯 Navigation:', { screen, params, hasValidId: isValidObjectId(params.id) });
+```
+
+### Vérification Cache vs API
+```typescript
+console.log('📍 Sync Decision:', { hasLocal: !!localData, isStale: lastSync < fiveMinAgo });
+```
+
+---
+
+## Migration & Fix d'Urgence
+
+### Reset Base Corrompue
+```bash
+npx expo start --clear  # Vide cache + base WatermelonDB
+```
+
+### Fix IDs Courts Détectés
+1. Identifier hook de sync défaillant
+2. Ajouter `step._setRaw('id', apiStep._id)` en première ligne
+3. Reset complet avec `--clear`
+4. Valider nouveaux ObjectIds dans logs
+
+### Résolution Boucles Infinies
+1. Identifier double chargement (hook + écran)
+2. Désactiver `useEffect` du hook OU `useFocusEffect` de l'écran
+3. Ajouter conditions strictes : `!loading && !syncing`
+4. Minimiser dépendances `useCallback`
+
+---
+
+**🎯 PRINCIPE GÉNÉRAL** : Offline-first, ObjectIds préservés, conditions strictes, logs structurés
 
 ### Configuration Environnement (`src/config/index.ts`)
 - `ENV_CONFIG.DEBUG` conditionne API_BASE_URL debug/release
