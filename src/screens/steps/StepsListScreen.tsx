@@ -2,7 +2,7 @@
  * Écran de liste des étapes d'un roadtrip
  * Support offline-first avec synchronisation automatique
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useTheme } from '../../contexts';
@@ -62,6 +62,28 @@ const StepsListScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  /**
+   * Rafraîchissement au focus pour capturer les modifications d'édition
+   * ✅ OPTIMISÉ: Rafraîchit seulement après retour explicite d'édition
+   */
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔧 StepsListScreen - useFocusEffect déclenché:', {
+        hasSteps: steps.length > 0,
+        loading,
+        roadtripId
+      });
+      
+      // Vérifier si on a un paramètre indiquant qu'on revient d'une édition
+      if (route.params && (route.params as any).refreshAfterEdit && steps.length > 0 && !loading) {
+        console.log('🔧 StepsListScreen - useFocusEffect: Rafraîchissement après édition détectée');
+        refreshSteps(true); // Force refresh depuis l'API
+        // Nettoyer le paramètre pour éviter les rafraîchissements futurs
+        navigation.setParams({ refreshAfterEdit: false } as any);
+      }
+    }, [steps.length, loading, roadtripId, route.params])
+  );
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -102,7 +124,21 @@ const StepsListScreen: React.FC = () => {
   };
 
   const handleEditStep = (step: Step) => {
-    Alert.alert('À implémenter', `Modifier "${step.title}" - fonctionnalité à venir`);
+    if (!step._id) {
+      Alert.alert('Erreur', 'Impossible d\'éditer cette étape');
+      return;
+    }
+    
+    console.log('📝 StepsListScreen - Navigation vers édition:', {
+      stepId: step._id,
+      roadtripId,
+      stepName: step.title
+    });
+    
+    navigation.navigate('EditStep', { 
+      stepId: step._id, 
+      roadtripId 
+    });
   };
 
   const handleDeleteStep = (step: Step) => {

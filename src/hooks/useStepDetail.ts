@@ -173,6 +173,8 @@ const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
   console.log('💾 saveStepDetailToLocal - userId API:', {
     userId: apiStep.userId,
     stepId: apiStep._id,
+    stepIdType: typeof apiStep._id,
+    stepIdLength: apiStep._id?.length,
     stepName: apiStep.name,
     roadtripId: apiStep.roadtripId
   });
@@ -247,7 +249,16 @@ const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
 
       await stepsCollection.create((step: StepModel) => {
         // CRITIQUE: Préserver l'ObjectId MongoDB
-        step._raw.id = String(apiStep._id);
+        const mongoIdString = String(apiStep._id);
+        console.log('💾 saveStepDetailToLocal - Création avec ID:', {
+          originalId: apiStep._id,
+          originalIdType: typeof apiStep._id,
+          mongoIdString,
+          mongoIdStringType: typeof mongoIdString,
+          mongoIdStringLength: mongoIdString.length
+        });
+        
+        step._raw.id = mongoIdString;
         Object.keys(rawData).forEach(key => {
           step._setRaw(key, (rawData as any)[key]);
         });
@@ -261,8 +272,36 @@ const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
  */
 const loadStepDetailFromLocal = async (stepId: string): Promise<Step | null> => {
   try {
+    console.log('📱 loadStepDetailFromLocal - Recherche pour stepId:', {
+      stepId,
+      stepIdType: typeof stepId,
+      stepIdLength: stepId?.length,
+      isValidObjectId: /^[0-9a-fA-F]{24}$/.test(stepId)
+    });
+
     const stepsCollection = database.get<StepModel>('steps');
-    const stepModel = await stepsCollection.find(stepId);
+    
+    // D'abord essayer avec find()
+    let stepModel;
+    try {
+      stepModel = await stepsCollection.find(stepId);
+      console.log('📱 loadStepDetailFromLocal - Trouvé avec find():', stepModel.id);
+    } catch (findError) {
+      console.log('📱 loadStepDetailFromLocal - find() échoué, essai avec query()');
+      
+      // Si find() échoue, essayer avec query()
+      const foundSteps = await stepsCollection
+        .query(Q.where('id', stepId))
+        .fetch();
+      
+      if (foundSteps.length > 0) {
+        stepModel = foundSteps[0];
+        console.log('📱 loadStepDetailFromLocal - Trouvé avec query():', stepModel.id);
+      } else {
+        console.log('📱 loadStepDetailFromLocal - Aucun step trouvé avec ce stepId');
+        return null;
+      }
+    }
     
     // Debug userId récupéré du local
     console.log('📱 loadStepDetailFromLocal - userId local récupéré:', {
@@ -273,7 +312,7 @@ const loadStepDetailFromLocal = async (stepId: string): Promise<Step | null> => 
     
     return convertStepModelToStep(stepModel);
   } catch (error) {
-    console.log('📱 useStepDetail - Étape non trouvée en local:', stepId);
+    console.log('📱 useStepDetail - Étape non trouvée en local:', stepId, 'Erreur:', error);
     return null;
   }
 };
@@ -325,7 +364,12 @@ export const useStepDetail = (stepId: string): UseStepDetailResult => {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  console.log('🔧 useStepDetail - Hook initialisé pour stepId:', stepId);
+  console.log('🔧 useStepDetail - Hook initialisé pour stepId:', {
+    stepId,
+    stepIdType: typeof stepId,
+    stepIdLength: stepId?.length,
+    isValidObjectId: stepId ? /^[0-9a-fA-F]{24}$/.test(stepId) : false
+  });
 
   /**
    * Fonction principale de chargement des détails

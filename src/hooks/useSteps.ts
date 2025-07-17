@@ -56,12 +56,16 @@ const convertApiStepToStep = (apiStep: ApiStep): Step => {
   (step as any).travelTimeNote = apiStep.travelTimeNote;
 
   console.log('🔄 convertApiStepToStep - Step converti:', {
+    originalApiStepId: apiStep._id,
+    originalApiStepIdType: typeof apiStep._id,
+    convertedStepId: step._id,
+    convertedStepIdType: typeof step._id,
     title: step.title,
-    type: step.type,
-    activitiesCount: apiStep.activities?.length || 0,
-    accommodationsCount: apiStep.accommodations?.length || 0,
-    thumbnail: apiStep.thumbnail,
-    thumbnailFromAPI: apiStep.thumbnail ? 'présente' : 'absente'
+    // type: step.type,
+    // activitiesCount: apiStep.activities?.length || 0,
+    // accommodationsCount: apiStep.accommodations?.length || 0,
+    // thumbnail: apiStep.thumbnail,
+    // thumbnailFromAPI: apiStep.thumbnail ? 'présente' : 'absente'
   });
 
   return step;
@@ -193,6 +197,11 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
             (stepInterface as any).travelTimeNote = step.travelTimeNote || 'OK';
 
             console.log('🗄️ CACHE - Step récupéré du cache:', {
+              stepId: stepInterface._id,
+              stepIdType: typeof stepInterface._id,
+              stepIdLength: stepInterface._id?.length,
+              stepModelId: step.id,
+              stepModelIdType: typeof step.id,
               title: stepInterface.title,
               // thumbnail: stepInterface.thumbnail ? 'présente' : 'absente',
               // thumbnailValue: stepInterface.thumbnail,
@@ -273,105 +282,160 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
         await database.write(async () => {
           const stepsCollection = database.get<StepModel>('steps');
 
-          // Supprime les étapes existantes pour ce roadtrip
+          // Récupérer les étapes existantes pour ce roadtrip
           const existingSteps = await stepsCollection
             .query(Q.where('roadtrip_id', roadtripId))
             .fetch();
 
-          for (const step of existingSteps) {
-            await step.markAsDeleted();
-          }
+          console.log('🗄️ WatermelonDB - Steps existants trouvés:', existingSteps.length);
+
+          // Créer un Map des steps existants par ID pour éviter les doublons
+          const existingStepsMap = new Map(existingSteps.map(step => [step.id, step]));
 
           // Timestamp de synchronisation pour marquer les données comme fraîches
           const syncTimestamp = Date.now();
 
-          // Ajoute les nouvelles étapes avec fix closure
+          // Traiter chaque step de l'API
           for (const apiStep of apiSteps) {
             if (!apiStep || !apiStep._id || !apiStep.type) {
               console.warn('Step ignoré - données incomplètes:', apiStep?._id || 'ID manquant');
               continue;
             }
 
-            try {
-              // Log pour vérifier le type de l'API
-              console.log('🔧 WatermelonDB - Type API reçu:', apiStep.type, 'pour step:', apiStep.name);
-              console.log('🔧 WatermelonDB - Thumbnail API:', apiStep.thumbnail ? 'présente' : 'absente');
-
-              // Sérialisation correcte de la thumbnail (objet → string)
-              let thumbnailString = '';
-              if (apiStep.thumbnail) {
-                if (typeof apiStep.thumbnail === 'string') {
-                  thumbnailString = apiStep.thumbnail;
-                } else if (typeof apiStep.thumbnail === 'object' && (apiStep.thumbnail as any).url) {
-                  thumbnailString = JSON.stringify(apiStep.thumbnail);
+            const mongoIdString = String(apiStep._id);
+            
+            // Vérifier si le step existe déjà
+            const existingStep = existingStepsMap.get(mongoIdString);
+            
+            if (existingStep) {
+              console.log('🔄 WatermelonDB - Mise à jour step existant:', apiStep.name);
+              
+              // Mettre à jour le step existant
+              await existingStep.update((step: StepModel) => {
+                step._setRaw('name', apiStep.name || '');
+                step._setRaw('address', apiStep.address || '');
+                step._setRaw('latitude', apiStep.latitude || 0);
+                step._setRaw('longitude', apiStep.longitude || 0);
+                step._setRaw('arrival_date_time', apiStep.arrivalDateTime ? new Date(apiStep.arrivalDateTime).getTime() : Date.now());
+                step._setRaw('departure_date_time', apiStep.departureDateTime ? new Date(apiStep.departureDateTime).getTime() : Date.now());
+                step._setRaw('travel_time_previous_step', apiStep.travelTimePreviousStep || 0);
+                step._setRaw('distance_previous_step', apiStep.distancePreviousStep || 0);
+                step._setRaw('travel_time_note', apiStep.travelTimeNote || 'OK');
+                step._setRaw('notes', apiStep.notes || '');
+                step._setRaw('activities', JSON.stringify(apiStep.activities || []));
+                step._setRaw('accommodations', JSON.stringify(apiStep.accommodations || []));
+                step._setRaw('last_sync_at', syncTimestamp);
+                step._setRaw('updated_at', syncTimestamp);
+                
+                // Gestion de la thumbnail
+                if (apiStep.thumbnail) {
+                  if (typeof apiStep.thumbnail === 'string') {
+                    step._setRaw('thumbnail', apiStep.thumbnail);
+                  } else if (typeof apiStep.thumbnail === 'object' && (apiStep.thumbnail as any).url) {
+                    step._setRaw('thumbnail', JSON.stringify(apiStep.thumbnail));
+                  } else {
+                    step._setRaw('thumbnail', JSON.stringify(apiStep.thumbnail));
+                  }
                 } else {
-                  thumbnailString = JSON.stringify(apiStep.thumbnail);
+                  step._setRaw('thumbnail', '');
                 }
-              }
-
-              // Préparation complète des données AVANT la closure (version minimale)
-              const rawData = {
-                user_id: apiStep.userId || 'unknown',
-                roadtrip_id: apiStep.roadtripId || roadtripId,
-                type: apiStep.type, // Utilise le type de l'API (Stage ou Stop)
-                name: apiStep.name || '',
-                address: apiStep.address || '',
-                latitude: apiStep.latitude || 0,
-                longitude: apiStep.longitude || 0,
-                arrival_date_time: apiStep.arrivalDateTime ? new Date(apiStep.arrivalDateTime).getTime() : Date.now(),
-                departure_date_time: apiStep.departureDateTime ? new Date(apiStep.departureDateTime).getTime() : Date.now(),
-                travel_time_previous_step: apiStep.travelTimePreviousStep || 0,
-                distance_previous_step: apiStep.distancePreviousStep || 0,
-                is_arrival_time_consistent: true,
-                travel_time_note: apiStep.travelTimeNote || 'OK', // Utilise la valeur de l'API
-                notes: apiStep.notes || '',
-                thumbnail: thumbnailString, // Thumbnail sérialisée
-                story: '',
-                activities: JSON.stringify(apiStep.activities || []), // Sérialise les activités
-                accommodations: JSON.stringify(apiStep.accommodations || []), // Sérialise les accommodations
-                // Champs BaseModel gérés manuellement
-                sync_status: 'synced',
-                last_sync_at: syncTimestamp,
-                created_at: syncTimestamp,
-                updated_at: syncTimestamp,
-                // Note: sync_status et last_sync_at gérés par BaseModel
-              };
-
-              const mongoIdString = String(apiStep._id);
-
-              // Création avec ObjectId MongoDB comme ID primaire
-              await stepsCollection.create((step: StepModel) => {
-                // CRITIQUE: Utiliser l'ObjectId MongoDB comme ID primaire
-                step._raw.id = mongoIdString;
-                step._setRaw('user_id', rawData.user_id);
-                step._setRaw('roadtrip_id', rawData.roadtrip_id);
-                step._setRaw('type', rawData.type);
-                step._setRaw('name', rawData.name);
-                step._setRaw('address', rawData.address);
-                step._setRaw('latitude', rawData.latitude);
-                step._setRaw('longitude', rawData.longitude);
-                step._setRaw('arrival_date_time', rawData.arrival_date_time);
-                step._setRaw('departure_date_time', rawData.departure_date_time);
-                step._setRaw('travel_time_previous_step', rawData.travel_time_previous_step);
-                step._setRaw('distance_previous_step', rawData.distance_previous_step);
-                step._setRaw('is_arrival_time_consistent', rawData.is_arrival_time_consistent);
-                step._setRaw('travel_time_note', rawData.travel_time_note);
-                step._setRaw('notes', rawData.notes);
-                step._setRaw('thumbnail', rawData.thumbnail);
-                step._setRaw('story', rawData.story);
-                step._setRaw('activities', rawData.activities);
-                step._setRaw('accommodations', rawData.accommodations);
-                step._setRaw('sync_status', rawData.sync_status);
-                step._setRaw('last_sync_at', rawData.last_sync_at);
-                step._setRaw('created_at', rawData.created_at);
-                step._setRaw('updated_at', rawData.updated_at);
               });
+              
+              // Retirer de la liste des existants (pour éviter la suppression)
+              existingStepsMap.delete(mongoIdString);
+              
+            } else {
+              console.log('➕ WatermelonDB - Création nouveau step:', apiStep.name);
 
-              console.log('✅ Step sauvegardé en local:', rawData.name);
-            } catch (stepErr) {
-              console.warn('Erreur création step en base locale:', stepErr);
-              // Continue même si la sauvegarde locale échoue
+              try {
+                // Log pour vérifier le type de l'API
+                console.log('🔧 WatermelonDB - Type API reçu:', apiStep.type, 'pour step:', apiStep.name);
+                console.log('🔧 WatermelonDB - Thumbnail API:', apiStep.thumbnail ? 'présente' : 'absente');
+
+                // Sérialisation correcte de la thumbnail (objet → string)
+                let thumbnailString = '';
+                if (apiStep.thumbnail) {
+                  if (typeof apiStep.thumbnail === 'string') {
+                    thumbnailString = apiStep.thumbnail;
+                  } else if (typeof apiStep.thumbnail === 'object' && (apiStep.thumbnail as any).url) {
+                    thumbnailString = JSON.stringify(apiStep.thumbnail);
+                  } else {
+                    thumbnailString = JSON.stringify(apiStep.thumbnail);
+                  }
+                }
+
+                // Préparation complète des données AVANT la closure (version minimale)
+                const rawData = {
+                  user_id: apiStep.userId || 'unknown',
+                  roadtrip_id: apiStep.roadtripId || roadtripId,
+                  type: apiStep.type, // Utilise le type de l'API (Stage ou Stop)
+                  name: apiStep.name || '',
+                  address: apiStep.address || '',
+                  latitude: apiStep.latitude || 0,
+                  longitude: apiStep.longitude || 0,
+                  arrival_date_time: apiStep.arrivalDateTime ? new Date(apiStep.arrivalDateTime).getTime() : Date.now(),
+                  departure_date_time: apiStep.departureDateTime ? new Date(apiStep.departureDateTime).getTime() : Date.now(),
+                  travel_time_previous_step: apiStep.travelTimePreviousStep || 0,
+                  distance_previous_step: apiStep.distancePreviousStep || 0,
+                  is_arrival_time_consistent: true,
+                  travel_time_note: apiStep.travelTimeNote || 'OK', // Utilise la valeur de l'API
+                  notes: apiStep.notes || '',
+                  thumbnail: thumbnailString, // Thumbnail sérialisée
+                  story: '',
+                  activities: JSON.stringify(apiStep.activities || []), // Sérialise les activités
+                  accommodations: JSON.stringify(apiStep.accommodations || []), // Sérialise les accommodations
+                  // Champs BaseModel gérés manuellement
+                  sync_status: 'synced',
+                  last_sync_at: syncTimestamp,
+                  created_at: syncTimestamp,
+                  updated_at: syncTimestamp,
+                  // Note: sync_status et last_sync_at gérés par BaseModel
+                };
+
+                // Création avec ObjectId MongoDB comme ID primaire
+                await stepsCollection.create((step: StepModel) => {
+                  // CRITIQUE: Utiliser l'ObjectId MongoDB comme ID primaire
+                  step._raw.id = mongoIdString;
+                  step._setRaw('user_id', rawData.user_id);
+                  step._setRaw('roadtrip_id', rawData.roadtrip_id);
+                  step._setRaw('type', rawData.type);
+                  step._setRaw('name', rawData.name);
+                  step._setRaw('address', rawData.address);
+                  step._setRaw('latitude', rawData.latitude);
+                  step._setRaw('longitude', rawData.longitude);
+                  step._setRaw('arrival_date_time', rawData.arrival_date_time);
+                  step._setRaw('departure_date_time', rawData.departure_date_time);
+                  step._setRaw('travel_time_previous_step', rawData.travel_time_previous_step);
+                  step._setRaw('distance_previous_step', rawData.distance_previous_step);
+                  step._setRaw('is_arrival_time_consistent', rawData.is_arrival_time_consistent);
+                  step._setRaw('travel_time_note', rawData.travel_time_note);
+                  step._setRaw('notes', rawData.notes);
+                  step._setRaw('thumbnail', rawData.thumbnail);
+                  step._setRaw('story', rawData.story);
+                  step._setRaw('activities', rawData.activities);
+                  step._setRaw('accommodations', rawData.accommodations);
+                  step._setRaw('sync_status', rawData.sync_status);
+                  step._setRaw('last_sync_at', rawData.last_sync_at);
+                  step._setRaw('created_at', rawData.created_at);
+                  step._setRaw('updated_at', rawData.updated_at);
+                });
+
+                console.log('✅ Step sauvegardé en local:', {
+                  id: mongoIdString,
+                  userId: rawData.user_id,
+                  name: rawData.name
+                });
+              } catch (stepErr) {
+                console.error('❌ Erreur création step en base locale:', stepErr);
+                // Continue même si la sauvegarde locale échoue
+              }
             }
+          }
+
+          // Supprimer les steps qui ne sont plus dans l'API
+          for (const [stepId, step] of existingStepsMap) {
+            console.log('🗑️ WatermelonDB - Suppression step obsolète:', step.name);
+            await step.markAsDeleted();
           }
 
           console.log('✅ Synchronisation locale terminée avec timestamp:', new Date(syncTimestamp).toISOString());

@@ -365,8 +365,19 @@ const EditStepScreen: React.FC = () => {
             {
               text: 'OK',
               onPress: () => {
-                refreshStepDetail(true);
-                navigation.goBack();
+                // Stratégie de rafraîchissement agressive pour s'assurer que tous les écrans sont à jour
+                console.log('🔄 EditStepScreen - Début rafraîchissement post-sauvegarde');
+                
+                // 1. Forcer le rafraîchissement des détails de l'étape
+                refreshStepDetail(true).then(() => {
+                  console.log('✅ EditStepScreen - Rafraîchissement step detail terminé');
+                  // 2. Retourner à l'écran précédent après le refresh
+                  navigation.goBack();
+                }).catch(err => {
+                  console.warn('⚠️ EditStepScreen - Erreur rafraîchissement step detail:', err);
+                  // Même en cas d'erreur, retourner à l'écran précédent
+                  navigation.goBack();
+                });
               }
             }
           ]

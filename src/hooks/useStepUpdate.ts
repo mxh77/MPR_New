@@ -3,6 +3,7 @@
  * Conforme aux instructions Copilot pour éviter les appels multiples
  */
 import { useState, useCallback } from 'react';
+import { Q } from '@nozbe/watermelondb';
 import { database } from '../services/database';
 import { updateStep } from '../services/api/steps';
 import type { UpdateStepRequest } from '../services/api/steps';
@@ -30,8 +31,24 @@ const updateStepInLocal = async (stepId: string, apiStep: ApiStep): Promise<void
     const stepsCollection = database.get<StepModel>('steps');
     
     try {
-      // Chercher l'étape existante
-      const existingStep = await stepsCollection.find(stepId);
+      // Essayer de trouver l'étape par ID direct
+      let existingStep: StepModel;
+      
+      try {
+        existingStep = await stepsCollection.find(stepId);
+      } catch (directFindError) {
+        // Si l'ID direct ne fonctionne pas, chercher par requête
+        console.log('⚠️ useStepUpdate - ID direct non trouvé, recherche par query...');
+        const stepsFound = await stepsCollection
+          .query(Q.where('id', stepId))
+          .fetch();
+        
+        if (stepsFound.length === 0) {
+          throw new Error(`Étape avec ID ${stepId} non trouvée en local`);
+        }
+        
+        existingStep = stepsFound[0];
+      }
       
       // Préparer les données avant la closure
       const rawData = {
@@ -64,10 +81,9 @@ const updateStepInLocal = async (stepId: string, apiStep: ApiStep): Promise<void
 
       console.log('✅ useStepUpdate - Étape mise à jour en local:', apiStep.name);
       
-    } catch (notFoundError) {
-      console.warn('⚠️ useStepUpdate - Étape non trouvée en local pour mise à jour:', stepId);
-      // En cas d'erreur, on pourrait créer l'étape, mais c'est inhabituel
-      throw new Error('Étape non trouvée en local');
+    } catch (error) {
+      console.error('❌ useStepUpdate - Échec mise à jour locale:', error);
+      throw error;
     }
   });
 };
@@ -112,13 +128,27 @@ export const useStepUpdate = (): UseStepUpdateResult => {
       const updatedApiStep = await updateStep(stepId, data);
       
       console.log('✅ useStepUpdate - Réponse API reçue:', {
-        name: updatedApiStep.name,
-        type: updatedApiStep.type,
-        userId: updatedApiStep.userId
+        name: updatedApiStep?.name,
+        type: updatedApiStep?.type,
+        userId: updatedApiStep?.userId,
+        isNull: updatedApiStep === null,
+        isUndefined: updatedApiStep === undefined,
+        typeof: typeof updatedApiStep
       });
 
-      // Mettre à jour en local
-      await updateStepInLocal(stepId, updatedApiStep);
+      if (!updatedApiStep) {
+        throw new Error('L\'API a retourné une réponse vide');
+      }
+
+      // Mettre à jour en local (si possible, sinon continuer)
+      try {
+        await updateStepInLocal(stepId, updatedApiStep);
+        console.log('✅ useStepUpdate - Mise à jour locale réussie');
+      } catch (localError: any) {
+        console.warn('⚠️ useStepUpdate - Mise à jour locale échouée, mais API OK:', localError.message);
+        // Ne pas faire échouer la sauvegarde si seule la mise à jour locale échoue
+        // L'API a fonctionné, c'est le plus important
+      }
 
       console.log('✅ useStepUpdate - Mise à jour terminée avec succès');
       

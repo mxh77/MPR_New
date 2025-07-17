@@ -72,7 +72,14 @@ const StepDetailScreen: React.FC = () => {
     { key: 'info', title: 'Infos', icon: 'information-circle' },
   ]);
 
-  console.log('StepDetailScreen - stepId:', stepId, 'roadtripId:', roadtripId);
+  console.log('🔍 StepDetailScreen - stepId reçu:', {
+    stepId,
+    stepIdType: typeof stepId,
+    stepIdLength: stepId?.length,
+    isValidObjectId: /^[0-9a-fA-F]{24}$/.test(stepId),
+    roadtripId,
+    roadtripIdType: typeof roadtripId
+  });
   // Debug réduit pour éviter les re-renders excessifs
   // console.log('🔧 StepDetailScreen - États:', { 
   //   hasStep: !!step, 
@@ -151,23 +158,23 @@ const StepDetailScreen: React.FC = () => {
 
   /**
    * Chargement initial avec useFocusEffect pour rechargement au focus
-   * OPTIMISÉ: Utilise une référence stable pour éviter les re-renders
+   * ✅ OPTIMISÉ: Rafraîchit seulement au chargement initial
    */
   useFocusEffect(
     useCallback(() => {
-      // Conditions strictes selon nos instructions Copilot anti-appels multiples
+      console.log('🔧 StepDetailScreen - useFocusEffect déclenché:', {
+        hasStep: !!step,
+        loading,
+        syncing,
+        stepName: step?.title
+      });
+      
+      // Chargement initial uniquement si pas de step du tout
       if (!step && !loading && !syncing) {
         console.log('🔧 StepDetailScreen - useFocusEffect: Chargement initial des détails');
         fetchStepDetailRef.current();
-      } else {
-        console.log('🔧 StepDetailScreen - useFocusEffect: Chargement ignoré', {
-          hasStep: !!step,
-          loading,
-          syncing,
-          reason: 'conditions non remplies'
-        });
       }
-    }, [step, loading, syncing]) // Dépendances stables uniquement
+    }, [step, loading, syncing]) // Dépendances minimales
   );
 
   /**

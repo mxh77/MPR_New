@@ -96,15 +96,33 @@ export const createStep = async (stepData: CreateStepRequest): Promise<ApiStep> 
  */
 export const updateStep = async (stepId: string, stepData: UpdateStepRequest): Promise<ApiStep> => {
   try {
-    const response: AxiosResponse<StepResponse> = await apiClient.put(`/steps/${stepId}`, stepData);
+    console.log('🔧 updateStep - Début appel API:', { stepId, stepData });
     
-    if (response.data.success) {
-      return response.data.data;
+    const response: AxiosResponse<ApiStep> = await apiClient.put(`/steps/${stepId}`, stepData);
+    
+    console.log('🔧 updateStep - Réponse brute reçue:', {
+      status: response.status,
+      statusText: response.statusText,
+      hasData: !!response.data,
+      dataKeys: Object.keys(response.data || {}),
+      stepName: response.data?.name
+    });
+    
+    // L'API retourne directement l'objet step, comme getStepById
+    if (response.data && response.data._id) {
+      console.log('✅ updateStep - Succès, retour des données:', {
+        _id: response.data._id,
+        name: response.data.name,
+        type: response.data.type
+      });
+      return response.data;
     } else {
-      throw new Error(response.data.message || 'Erreur lors de la mise à jour de l\'étape');
+      const errorMsg = 'Réponse API invalide - pas de données step';
+      console.error('❌ updateStep - Échec API:', errorMsg, response.data);
+      throw new Error(errorMsg);
     }
   } catch (error) {
-    console.error('Erreur updateStep:', error);
+    console.error('❌ updateStep - Erreur réseau/parsing:', error);
     throw error;
   }
 };
