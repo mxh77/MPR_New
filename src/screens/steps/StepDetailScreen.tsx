@@ -174,8 +174,22 @@ const StepDetailScreen: React.FC = () => {
    * Navigation vers l'édition
    */
   const handleEdit = useCallback(() => {
-    Alert.alert('À implémenter', 'Édition d\'étape - fonctionnalité à venir');
-  }, []);
+    if (!step?._id) {
+      Alert.alert('Erreur', 'Impossible d\'éditer cette étape');
+      return;
+    }
+    
+    console.log('📝 StepDetailScreen - Navigation vers édition:', {
+      stepId: step._id,
+      roadtripId,
+      stepName: step.title
+    });
+    
+    navigation.navigate('EditStep', { 
+      stepId: step._id, 
+      roadtripId 
+    });
+  }, [step, roadtripId, navigation]);
 
   /**
    * Suppression de l'étape
