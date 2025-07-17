@@ -51,6 +51,12 @@ Application mobile React Native pour la planification et gestion de road trips a
    # Éditer .env avec vos configurations
    ```
 
+   ⚠️ **Important - Sécurité** :
+   - **JAMAIS** commiter le fichier `.env` avec de vraies clés API
+   - Générez vos propres clés API Google Maps sur [Google Cloud Console](https://console.cloud.google.com/)
+   - Remplacez `YOUR_GOOGLE_MAPS_API_KEY_HERE` par votre vraie clé
+   - Le fichier `.env` est dans `.gitignore` pour votre protection
+
 4. **Démarrer le projet**
    ```bash
    npm run start
