@@ -673,13 +673,13 @@ const EditStepScreen: React.FC = () => {
    */
   const CustomHeader = React.memo(() => (
     <View style={[styles.header, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <StatusBar backgroundColor={theme.colors.surface} barStyle="dark-content" />
       <View style={styles.headerContent}>
         <TouchableOpacity
           style={styles.headerButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>Modifier l'étape</Text>
@@ -690,15 +690,203 @@ const EditStepScreen: React.FC = () => {
           disabled={saving || updating}
         >
           {saving || updating ? (
-            <ActivityIndicator size="small" color={colors.white} />
+            <ActivityIndicator size="small" color="white" />
           ) : (
-            <Ionicons name="checkmark" size={24} color={colors.white} />
+            <Ionicons name="checkmark" size={24} color="white" />
           )}
         </TouchableOpacity>
       </View>
     </View>
   ));
   CustomHeader.displayName = 'CustomHeader';
+
+  // Styles dynamiques utilisant le thème
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      backgroundColor: theme.colors.surface,
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      height: 56,
+    },
+    headerButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerButtonDisabled: {
+      opacity: 0.6,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+      flex: 1,
+      textAlign: 'center',
+      marginHorizontal: 16,
+    },
+    content: {
+      flex: 1,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 16,
+      paddingBottom: 32,
+    },
+    inputContainer: {
+      marginBottom: 24,
+    },
+    inputHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    inputLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginLeft: 8,
+    },
+    textInput: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: theme.colors.text,
+      minHeight: 48,
+    },
+    textInputMultiline: {
+      minHeight: 100,
+      paddingTop: 12,
+      textAlignVertical: 'top',
+    },
+    googlePlacesContainer: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    dateTimeRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    dateInputContainer: {
+      flex: 2,
+    },
+    timeInputContainer: {
+      flex: 1,
+    },
+    dateTimeSubLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: theme.colors.textSecondary,
+      marginBottom: 4,
+    },
+    dateTimeInput: {
+      minHeight: 44,
+    },
+    dateTimeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    dateTimeButtonText: {
+      fontSize: 16,
+      color: theme.colors.text,
+      flex: 1,
+    },
+    placeholderText: {
+      color: theme.colors.textSecondary,
+    },
+    // Styles pour les éléments désactivés
+    disabledLabel: {
+      color: theme.colors.textSecondary,
+    },
+    disabledInput: {
+      backgroundColor: theme.colors.disabled,
+      borderColor: theme.colors.border,
+    },
+    disabledText: {
+      color: theme.colors.textSecondary,
+    },
+    disabledInfoContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: 'auto',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      backgroundColor: theme.colors.warning + '20', // Warning color with 20% opacity
+      borderRadius: 8,
+    },
+    disabledInfo: {
+      fontSize: 12,
+      color: theme.colors.warning,
+      marginLeft: 4,
+      fontWeight: '500',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 32,
+    },
+    loadingText: {
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+      marginTop: 16,
+      textAlign: 'center',
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 32,
+    },
+    errorText: {
+      fontSize: 16,
+      color: theme.colors.danger,
+      textAlign: 'center',
+      marginVertical: 16,
+      lineHeight: 24,
+    },
+    retryButton: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+      marginTop: 16,
+    },
+    retryButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    bottomPadding: {
+      height: 32,
+    },
+  });
 
   // États de chargement et d'erreur
   if (loading) {
@@ -744,8 +932,9 @@ const EditStepScreen: React.FC = () => {
         <ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
           showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={true}
         >
           {/* Nom de l'étape */}
           <CustomTextInput
@@ -826,190 +1015,5 @@ const EditStepScreen: React.FC = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.gray100,
-  },
-  header: {
-    backgroundColor: colors.primary,
-    elevation: 4,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    height: 56,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerButtonDisabled: {
-    opacity: 0.6,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.white,
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 16,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  inputContainer: {
-    marginBottom: 24,
-  },
-  inputHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.gray800,
-    marginLeft: 8,
-  },
-  textInput: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: colors.gray800,
-    minHeight: 48,
-  },
-  textInputMultiline: {
-    minHeight: 100,
-    paddingTop: 12,
-    textAlignVertical: 'top',
-  },
-  googlePlacesContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-  },
-  dateTimeRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  dateInputContainer: {
-    flex: 2,
-  },
-  timeInputContainer: {
-    flex: 1,
-  },
-  dateTimeSubLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.gray600,
-    marginBottom: 4,
-  },
-  dateTimeInput: {
-    minHeight: 44,
-  },
-  dateTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dateTimeButtonText: {
-    fontSize: 16,
-    color: colors.gray800,
-    flex: 1,
-  },
-  placeholderText: {
-    color: colors.gray500,
-  },
-  // Styles pour les éléments désactivés
-  disabledLabel: {
-    color: colors.gray500,
-  },
-  disabledInput: {
-    backgroundColor: colors.gray100,
-    borderColor: colors.gray200,
-  },
-  disabledText: {
-    color: colors.gray400,
-  },
-  disabledInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 'auto',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: colors.warning + '20', // Warning color with 20% opacity
-    borderRadius: 8,
-  },
-  disabledInfo: {
-    fontSize: 12,
-    color: colors.warning,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.gray600,
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  errorText: {
-    fontSize: 16,
-    color: colors.danger,
-    textAlign: 'center',
-    marginVertical: 16,
-    lineHeight: 24,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  retryButtonText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bottomPadding: {
-    height: 32,
-  },
-});
 
 export default EditStepScreen;

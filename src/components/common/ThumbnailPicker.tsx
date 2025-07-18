@@ -145,12 +145,12 @@ export const ThumbnailPicker: React.FC<ThumbnailPickerProps> = ({
    * Fonction pour extraire l'URI de l'image depuis value (string ou objet thumbnail)
    */
   const getImageUri = (thumbnailValue: string | object | null): string | null => {
-    console.log('🖼️ ThumbnailPicker - getImageUri - value reçu:', {
-      type: typeof thumbnailValue,
-      value: thumbnailValue,
-      hasUrl: thumbnailValue && typeof thumbnailValue === 'object' && (thumbnailValue as any).url,
-      isString: typeof thumbnailValue === 'string'
-    });
+    // console.log('🖼️ ThumbnailPicker - getImageUri - value reçu:', {
+    //   type: typeof thumbnailValue,
+    //   value: thumbnailValue,
+    //   hasUrl: thumbnailValue && typeof thumbnailValue === 'object' && (thumbnailValue as any).url,
+    //   isString: typeof thumbnailValue === 'string'
+    // });
     
     if (!thumbnailValue) {
       return null;
@@ -159,7 +159,7 @@ export const ThumbnailPicker: React.FC<ThumbnailPickerProps> = ({
     // Si c'est déjà une chaîne valide
     if (typeof thumbnailValue === 'string' && thumbnailValue.trim().length > 0) {
       const uri = thumbnailValue.trim();
-      console.log('🖼️ ThumbnailPicker - getImageUri - string:', uri);
+      // console.log('🖼️ ThumbnailPicker - getImageUri - string:', uri);
       return uri;
     }
     
@@ -168,24 +168,24 @@ export const ThumbnailPicker: React.FC<ThumbnailPickerProps> = ({
       const thumbnail = thumbnailValue as any;
       if (thumbnail.url && typeof thumbnail.url === 'string' && thumbnail.url.trim().length > 0) {
         const uri = thumbnail.url.trim();
-        console.log('🖼️ ThumbnailPicker - getImageUri - object.url:', uri);
+        // console.log('🖼️ ThumbnailPicker - getImageUri - object.url:', uri);
         return uri;
       }
       
       // Fallback: si c'est un objet avec une propriété uri
       if (thumbnail.uri && typeof thumbnail.uri === 'string' && thumbnail.uri.trim().length > 0) {
         const uri = thumbnail.uri.trim();
-        console.log('🖼️ ThumbnailPicker - getImageUri - object.uri:', uri);
+        // console.log('🖼️ ThumbnailPicker - getImageUri - object.uri:', uri);
         return uri;
       }
       
-      console.warn('🖼️ ThumbnailPicker - getImageUri - Objet thumbnail sans url/uri:', {
-        keys: Object.keys(thumbnail),
-        thumbnail
-      });
+      // console.warn('🖼️ ThumbnailPicker - getImageUri - Objet thumbnail sans url/uri:', {
+      //   keys: Object.keys(thumbnail),
+      //   thumbnail
+      // });
     }
     
-    console.log('🖼️ ThumbnailPicker - getImageUri - Aucun format reconnu');
+    // console.log('🖼️ ThumbnailPicker - getImageUri - Aucun format reconnu');
     return null;
   };
 

@@ -260,6 +260,23 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   // Configuration de la région calculée
   const initialRegion = calculateRegion();
 
+  // Style fallback optimisé pour éviter recréation
+  const fallbackMarkerStyle = {
+    backgroundColor: colors.primary,
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    borderWidth: 3,
+    borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  };
+
   // Ajuster la carte quand elle est prête et qu'il y a plusieurs markers
   useEffect(() => {
     if (mapReady && mapRef.current && markers.length > 0) {
@@ -395,13 +412,24 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
           {/* Marqueurs avec icônes typées */}
           {markers.map((marker) => {
             const markerStyle = getMarkerStyle(marker.type);
-            console.log('🎯 Marker Debug:', {
-              id: marker.id,
-              type: marker.type,
-              icon: markerStyle.icon,
-              color: markerStyle.color,
-              customColor: marker.color
-            });
+            const isMainStep = marker.id.includes('main-step');
+            
+            // Styles optimisés pour éviter le scintillement
+            const markerContainerStyle = {
+              backgroundColor: marker.color || markerStyle.color,
+              borderRadius: 20,
+              width: isMainStep ? 40 : 36,
+              height: isMainStep ? 40 : 36,
+              justifyContent: 'center' as const,
+              alignItems: 'center' as const,
+              borderWidth: isMainStep ? 3 : 2,
+              borderColor: 'white',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 5,
+            };
             
             return (
               <Marker
@@ -413,25 +441,12 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
                 title={marker.title}
                 description={marker.description}
                 onPress={() => handleMarkerPress(marker.id)}
+                tracksViewChanges={false} // ✅ CRITIQUE: Évite le scintillement
               >
-                <View style={{
-                  backgroundColor: marker.color || markerStyle.color,
-                  borderRadius: 20,
-                  width: marker.id.includes('main-step') ? 40 : 36, // Step principal plus grand
-                  height: marker.id.includes('main-step') ? 40 : 36,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderWidth: marker.id.includes('main-step') ? 3 : 2, // Bordure plus épaisse pour step principal
-                  borderColor: 'white',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 4,
-                  elevation: 5,
-                }}>
+                <View style={markerContainerStyle}>
                   <Ionicons 
                     name={markerStyle.icon as any} 
-                    size={marker.id.includes('main-step') ? 20 : 18} 
+                    size={isMainStep ? 20 : 18} 
                     color="white" 
                   />
                 </View>
@@ -446,22 +461,9 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
               title={title || 'Position'}
               description={address}
               onPress={() => handleMarkerPress('main')}
+              tracksViewChanges={false} // ✅ CRITIQUE: Évite le scintillement
             >
-              <View style={{
-                backgroundColor: colors.primary,
-                borderRadius: 20,
-                width: 40,
-                height: 40,
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 3,
-                borderColor: 'white',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.3,
-                shadowRadius: 4,
-                elevation: 5,
-              }}>
+              <View style={fallbackMarkerStyle}>
                 <Ionicons name="flag" size={20} color="white" />
               </View>
             </Marker>

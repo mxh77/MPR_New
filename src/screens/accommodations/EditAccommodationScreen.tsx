@@ -616,7 +616,12 @@ export const EditAccommodationScreen: React.FC = () => {
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
+          nestedScrollEnabled={true}
+        >
           
           {/* Section Informations générales */}
           <View style={styles.section}>
@@ -642,7 +647,7 @@ export const EditAccommodationScreen: React.FC = () => {
               Localisation
             </Text>
             
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, { zIndex: 1000 }]}>
               <View style={styles.inputHeader}>
                 <Ionicons name="location-outline" size={20} color={colors.primary} />
                 <Text style={styles.inputLabel}>Adresse</Text>

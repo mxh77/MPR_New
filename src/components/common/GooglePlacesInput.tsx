@@ -52,6 +52,7 @@ interface GooglePlacePrediction {
 interface GooglePlacesResponse {
   predictions: GooglePlacePrediction[];
   status: string;
+  error_message?: string;
 }
 
 // Styled Components
@@ -173,37 +174,106 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
   const inputRef = useRef<TextInput>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Debug - Vérifier la clé API au chargement du composant
+  useEffect(() => {
+    console.log('🔍 GooglePlacesInput - Configuration API:', {
+      hasKey: !!ENV.GOOGLE_API_KEY,
+      keyLength: ENV.GOOGLE_API_KEY?.length || 0,
+      keyStart: ENV.GOOGLE_API_KEY?.substring(0, 10) || 'undefined',
+      environment: ENV.ENVIRONMENT || 'unknown',
+      isDevelopment: ENV.IS_DEVELOPMENT || false
+    });
+    
+    // Test simple de l'API au chargement du composant
+    if (ENV.GOOGLE_API_KEY) {
+      testGooglePlacesAPI();
+    }
+  }, []);
+
+  // Fonction de test simple de l'API
+  const testGooglePlacesAPI = async () => {
+    try {
+      const testUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Paris&key=${ENV.GOOGLE_API_KEY}&language=fr`;
+      console.log('🧪 Test API URL:', testUrl.replace(ENV.GOOGLE_API_KEY, 'API_KEY_HIDDEN'));
+      
+      const response = await fetch(testUrl);
+      const data = await response.json();
+      
+      console.log('🧪 Test API résultat:', {
+        status: data.status,
+        predictionsCount: data.predictions?.length || 0,
+        error: data.error_message || 'aucune'
+      });
+      
+      if (data.status !== 'OK') {
+        console.error('🚨 API Google Places - Erreur:', data.error_message || data.status);
+      }
+    } catch (error) {
+      console.error('🚨 API Google Places - Erreur réseau:', error);
+    }
+  };
+
   // Couleur de l'icône par défaut basée sur le thème
   const finalIconColor = iconColor || theme.colors.primary;
 
   // Fonction pour récupérer les suggestions Google Places
   const fetchSuggestions = async (input: string) => {
+    console.log('🔍 GooglePlacesInput - fetchSuggestions appelé:', { input, length: input.length });
+    
     if (input.length < 2) {
+      console.log('🔍 GooglePlacesInput - Input trop court, arrêt');
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
     if (!ENV.GOOGLE_API_KEY) {
-      console.warn('GooglePlacesInput: GOOGLE_API_KEY manquante');
+      console.warn('🔍 GooglePlacesInput: GOOGLE_API_KEY manquante');
       return;
     }
 
+    console.log('🔍 GooglePlacesInput - Clé API trouvée, appel en cours...');
+
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${ENV.GOOGLE_API_KEY}&language=fr`
-      );
+      // SOLUTION TEMPORAIRE: Utiliser directement l'API avec note sur les restrictions
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${ENV.GOOGLE_API_KEY}&language=fr`;
+      console.log('🔍 GooglePlacesInput - URL API:', url.replace(ENV.GOOGLE_API_KEY, 'API_KEY_HIDDEN'));
+      
+      const response = await fetch(url);
       const data: GooglePlacesResponse = await response.json();
+      
+      console.log('🔍 GooglePlacesInput - Réponse API:', { status: data.status, predictionsCount: data.predictions?.length || 0 });
       
       if (data.status === 'OK' && data.predictions) {
         setSuggestions(data.predictions);
         setShowSuggestions(true);
+        console.log('🔍 GooglePlacesInput - Suggestions mises à jour:', data.predictions.length);
       } else {
+        console.log('🔍 GooglePlacesInput - Pas de suggestions trouvées:', data.status);
+        
+        // Messages d'erreur détaillés avec solutions
+        if (data.status === 'REQUEST_DENIED') {
+          console.error('🚨 ERREUR Google Places API - REQUEST_DENIED:');
+          console.error('  ➡️  SOLUTION: Ajoutez cette empreinte SHA-1 dans Google Cloud Console:');
+          console.error('      5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25');
+          console.error('  📍 Google Cloud Console > APIs & Services > Credentials');
+          console.error('  📍 Cliquez sur votre clé API > Application restrictions > Android apps');
+          console.error('  📍 Ajoutez l\'empreinte ci-dessus pour le mode développement');
+          console.error('  ⚠️  Gardez aussi l\'empreinte de release existante !');
+          if (data.error_message) {
+            console.error('  - Message d\'erreur:', data.error_message);
+          }
+        } else if (data.status === 'OVER_QUERY_LIMIT') {
+          console.error('🚨 ERREUR Google Places API - Limite de quota dépassée');
+        } else if (data.status === 'INVALID_REQUEST') {
+          console.error('🚨 ERREUR Google Places API - Requête invalide');
+        }
+        
         setSuggestions([]);
         setShowSuggestions(false);
       }
     } catch (error) {
-      console.error('Erreur lors de la récupération des suggestions:', error);
+      console.error('🔍 GooglePlacesInput - Erreur lors de la récupération des suggestions:', error);
       setSuggestions([]);
       setShowSuggestions(false);
     }
@@ -211,6 +281,7 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
 
   // Debounce pour éviter trop d'appels API
   const handleInputChange = (text: string) => {
+    console.log('🔍 GooglePlacesInput - handleInputChange:', { text, isFocused });
     onChangeText(text);
 
     // Annuler le précédent timeout
@@ -220,8 +291,11 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
 
     // Programmer la recherche après 300ms
     debounceTimeoutRef.current = setTimeout(() => {
+      console.log('🔍 GooglePlacesInput - Debounce timeout déclenché:', { text, isFocused });
       if (isFocused) {
         fetchSuggestions(text);
+      } else {
+        console.log('🔍 GooglePlacesInput - Pas de fetch car pas focused');
       }
     }, 300);
   };
@@ -237,7 +311,12 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
     }
     
     // NE PAS retirer le focus pour maintenir le clavier ouvert
-    // L'utilisateur peut continuer à taper après sélection
+    // Remettre le focus sur l'input pour garder le clavier ouvert après sélection
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 50);
   };
 
   // Gérer la suppression du contenu
@@ -262,21 +341,23 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
 
   // Gérer le focus
   const handleFocus = () => {
+    console.log('🔍 GooglePlacesInput - Focus reçu');
     setIsFocused(true);
     if (value.length >= 2) {
+      console.log('🔍 GooglePlacesInput - Fetch suggestions au focus car value >= 2');
       fetchSuggestions(value);
     }
   };
 
   // Gérer la perte de focus
   const handleBlur = () => {
+    console.log('🔍 GooglePlacesInput - Blur reçu');
     setIsFocused(false);
-    // Fermer immédiatement les suggestions quand on perd le focus
-    // (sauf si l'utilisateur clique sur une suggestion dans les 150ms)
+    // Délai pour permettre de cliquer sur une suggestion avant de fermer
     setTimeout(() => {
       setShowSuggestions(false);
       setSuggestions([]);
-    }, 150);
+    }, 200);
   };
 
   // Nettoyer les timeouts et fermer les suggestions si le composant perd le focus
@@ -300,6 +381,16 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
       return () => clearTimeout(timer);
     }
   }, [isFocused]);
+
+  // Log pour debug
+  if (__DEV__) {
+    console.log('🔍 GooglePlacesInput - Render:', { 
+      showSuggestions, 
+      suggestionsLength: suggestions.length, 
+      isFocused, 
+      value 
+    });
+  }
 
   return (
     <Container style={style}>
@@ -355,12 +446,12 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
             top: 56, // Hauteur approximative de l'input + padding
             left: 0,
             right: 0,
-            zIndex: 9999,
+            zIndex: 99999, // Z-index très élevé pour être au-dessus de tout
           }}
         >
           {/* Utiliser ScrollView avec map() au lieu de FlatList pour éviter l'erreur VirtualizedList */}
           <ScrollView
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always" // TOUJOURS garder le clavier ouvert
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
             style={{ maxHeight: 300 }}

@@ -328,57 +328,50 @@ const StepDetailScreen: React.FC = () => {
     );
   }, [step]);
 
-  /**
-   * Menu contextuel pour les actions sur l'étape
-   */
-  const showActionMenu = useCallback(() => {
-    const options = ['Modifier', 'Supprimer', 'Annuler'];
-    const destructiveButtonIndex = 1; // Index du bouton "Supprimer"
-    const cancelButtonIndex = 2; // Index du bouton "Annuler"
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          destructiveButtonIndex,
-          cancelButtonIndex,
-          title: step?.title || 'Actions',
-          message: 'Que souhaitez-vous faire ?',
-        },
-        (buttonIndex) => {
-          switch (buttonIndex) {
-            case 0: // Modifier
-              handleEdit();
-              break;
-            case 1: // Supprimer
-              handleDelete();
-              break;
-            // case 2 est Annuler, ne fait rien
-          }
-        }
-      );
-    } else {
-      // Pour Android, utiliser Alert avec plusieurs boutons
-      Alert.alert(
-        step?.title || 'Actions',
-        'Que souhaitez-vous faire ?',
-        [
-          { text: 'Modifier', onPress: handleEdit },
-          { 
-            text: 'Supprimer', 
-            style: 'destructive', 
-            onPress: handleDelete 
-          },
-          { text: 'Annuler', style: 'cancel' }
-        ]
-      );
-    }
-  }, [step, handleEdit, handleDelete]);
-
   // SUPPRIMÉ: useEffect double qui causait la boucle infinie
   // Le useFocusEffect gère déjà le chargement initial
 
   // Mise à jour du loading state - supprimé car géré par le hook
+
+  /**
+   * Supprimer le step avec confirmation - version directe sans menu
+   */
+  const handleDirectDeleteStep = () => {
+    if (!step?._id) {
+      Alert.alert('Erreur', 'Impossible de supprimer cette étape');
+      return;
+    }
+
+    Alert.alert(
+      'Supprimer l\'étape',
+      `Êtes-vous sûr de vouloir supprimer "${step.title || 'cette étape'}" ?\n\nCette action est irréversible.`,
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel'
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // TODO: Implémenter la suppression via hook
+              console.log('🗑️ Suppression step:', {
+                stepId: step._id,
+                title: step.title
+              });
+              
+              // Placeholder pour l'implémentation de la suppression
+              Alert.alert('À implémenter', 'Suppression d\'étape - fonctionnalité à venir');
+            } catch (error) {
+              console.error('Erreur suppression step:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer l\'étape');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   /**
    * Rendu de l'onglet Informations
@@ -411,30 +404,36 @@ const StepDetailScreen: React.FC = () => {
           if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
             return (
               <View style={styles.thumbnailContainer}>
-                {isValidImageUri(imageUri) ? (
-                  <Image
-                    source={{ uri: imageUri }}
-                    style={styles.stepThumbnail}
-                    resizeMode="cover"
-                    onError={(error) => {
-                      console.warn('🖼️ Erreur chargement thumbnail étape:', error.nativeEvent.error, 'URI:', imageUri);
-                    }}
-                  />
-                ) : (
-                  <View style={[styles.stepThumbnail, styles.placeholderImage, { backgroundColor: '#f0f0f0' }]}>
-                    <Ionicons name="image-outline" size={32} color={theme.colors.textSecondary} />
-                    <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
-                      Image non valide
-                    </Text>
-                  </View>
-                )}
-                {/* Menu d'actions (3 points) */}
+                <TouchableOpacity 
+                  onPress={handleEdit}
+                  activeOpacity={0.8}
+                  style={styles.stepThumbnail}
+                >
+                  {isValidImageUri(imageUri) ? (
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.stepThumbnail}
+                      resizeMode="cover"
+                      onError={(error) => {
+                        console.warn('🖼️ Erreur chargement thumbnail étape:', error.nativeEvent.error, 'URI:', imageUri);
+                      }}
+                    />
+                  ) : (
+                    <View style={[styles.stepThumbnail, styles.placeholderImage, { backgroundColor: '#f0f0f0' }]}>
+                      <Ionicons name="image-outline" size={32} color={theme.colors.textSecondary} />
+                      <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                        Image non valide
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                {/* Bouton supprimer */}
                 <TouchableOpacity 
                   style={styles.thumbnailMenuButton}
-                  onPress={showActionMenu}
+                  onPress={handleDirectDeleteStep}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Ionicons name="ellipsis-vertical" size={18} color="white" />
+                  <Ionicons name="trash" size={18} color="white" />
                 </TouchableOpacity>
               </View>
             );
@@ -451,13 +450,13 @@ const StepDetailScreen: React.FC = () => {
                     Appuyer pour ajouter une photo
                   </Text>
                 </TouchableOpacity>
-                {/* Menu d'actions pour placeholder */}
+                {/* Bouton supprimer pour placeholder */}
                 <TouchableOpacity 
                   style={styles.thumbnailMenuButtonPlaceholder}
-                  onPress={showActionMenu}
+                  onPress={handleDirectDeleteStep}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.textSecondary} />
+                  <Ionicons name="trash" size={18} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             );
@@ -556,26 +555,104 @@ const StepDetailScreen: React.FC = () => {
     };
 
     /**
-     * Menu d'actions pour un accommodation
+     * Supprimer un accommodation avec confirmation
      */
-    const showAccommodationActionMenu = (accommodation: any) => {
-      const options = [
-        {
-          text: 'Éditer',
-          onPress: () => handleEditAccommodation(accommodation),
-          style: 'default' as const
-        },
-        {
-          text: 'Annuler',
-          style: 'cancel' as const
-        }
-      ];
+    const handleDeleteAccommodation = (accommodation: any) => {
+      if (!accommodation?._id || !step?._id) {
+        Alert.alert('Erreur', 'Impossible de supprimer cet hébergement');
+        return;
+      }
 
       Alert.alert(
-        accommodation.name || 'Hébergement',
-        'Choisissez une action',
-        options
+        'Supprimer l\'hébergement',
+        `Êtes-vous sûr de vouloir supprimer "${accommodation.name || 'cet hébergement'}" ?\n\nCette action est irréversible.`,
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel'
+          },
+          {
+            text: 'Supprimer',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                // TODO: Implémenter la suppression via hook
+                console.log('🗑️ Suppression accommodation:', {
+                  stepId: step._id,
+                  accommodationId: accommodation._id,
+                  name: accommodation.name
+                });
+                
+                // Placeholder pour l'implémentation de la suppression
+                Alert.alert('À implémenter', 'Suppression d\'hébergement - fonctionnalité à venir');
+              } catch (error) {
+                console.error('Erreur suppression accommodation:', error);
+                Alert.alert('Erreur', 'Impossible de supprimer l\'hébergement');
+              }
+            }
+          }
+        ]
       );
+    };
+
+    /**
+     * Supprimer une activité avec confirmation
+     */
+    const handleDeleteActivity = (activity: any) => {
+      if (!activity?._id || !step?._id) {
+        Alert.alert('Erreur', 'Impossible de supprimer cette activité');
+        return;
+      }
+
+      Alert.alert(
+        'Supprimer l\'activité',
+        `Êtes-vous sûr de vouloir supprimer "${activity.name || 'cette activité'}" ?\n\nCette action est irréversible.`,
+        [
+          {
+            text: 'Annuler',
+            style: 'cancel'
+          },
+          {
+            text: 'Supprimer',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                // TODO: Implémenter la suppression via hook
+                console.log('🗑️ Suppression activity:', {
+                  stepId: step._id,
+                  activityId: activity._id,
+                  name: activity.name
+                });
+                
+                // Placeholder pour l'implémentation de la suppression
+                Alert.alert('À implémenter', 'Suppression d\'activité - fonctionnalité à venir');
+              } catch (error) {
+                console.error('Erreur suppression activity:', error);
+                Alert.alert('Erreur', 'Impossible de supprimer l\'activité');
+              }
+            }
+          }
+        ]
+      );
+    };
+
+    /**
+     * Éditer une activité
+     */
+    const handleEditActivity = (activity: any) => {
+      if (!activity?._id || !step?._id) {
+        Alert.alert('Erreur', 'Impossible d\'éditer cette activité');
+        return;
+      }
+      
+      console.log('📝 Navigation vers édition activity:', {
+        stepId: step._id,
+        activityId: activity._id,
+        name: activity.name
+      });
+      
+      // TODO: Implémenter navigation vers EditActivity
+      Alert.alert('À implémenter', 'Édition d\'activité - fonctionnalité à venir');
     };
 
     /**
@@ -628,27 +705,33 @@ const StepDetailScreen: React.FC = () => {
                   if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
                     return (
                       <View style={styles.thumbnailContainer}>
-                        {isValidImageUri(imageUri) ? (
-                          <SafeImage 
-                            thumbnail={accommodation.thumbnail}
-                            style={styles.stepThumbnail}
-                            placeholderIcon="bed-outline"
-                          />
-                        ) : (
-                          <View style={[styles.stepThumbnail, styles.placeholderImage, { backgroundColor: '#f0f0f0' }]}>
-                            <Ionicons name="bed-outline" size={32} color={theme.colors.textSecondary} />
-                            <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
-                              Image non valide
-                            </Text>
-                          </View>
-                        )}
-                        {/* Menu d'actions (3 points) - Style identique à l'onglet Infos */}
+                        <TouchableOpacity 
+                          style={styles.stepThumbnail}
+                          onPress={() => handleEditAccommodation(accommodation)}
+                          activeOpacity={0.8}
+                        >
+                          {isValidImageUri(imageUri) ? (
+                            <SafeImage 
+                              thumbnail={accommodation.thumbnail}
+                              style={styles.stepThumbnail}
+                              placeholderIcon="bed-outline"
+                            />
+                          ) : (
+                            <View style={[styles.stepThumbnail, styles.placeholderImage, { backgroundColor: '#f0f0f0' }]}>
+                              <Ionicons name="bed-outline" size={32} color={theme.colors.textSecondary} />
+                              <Text style={[styles.placeholderText, { color: theme.colors.textSecondary }]}>
+                                Image non valide
+                              </Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                        {/* Bouton supprimer avec confirmation */}
                         <TouchableOpacity 
                           style={styles.thumbnailMenuButton}
-                          onPress={() => showAccommodationActionMenu(accommodation)}
+                          onPress={() => handleDeleteAccommodation(accommodation)}
                           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                          <Ionicons name="ellipsis-vertical" size={18} color="white" />
+                          <Ionicons name="trash" size={18} color="white" />
                         </TouchableOpacity>
                       </View>
                     );
@@ -665,13 +748,13 @@ const StepDetailScreen: React.FC = () => {
                             Appuyer pour ajouter une photo
                           </Text>
                         </TouchableOpacity>
-                        {/* Menu d'actions pour placeholder - Style identique à l'onglet Infos */}
+                        {/* Bouton supprimer pour placeholder */}
                         <TouchableOpacity 
                           style={styles.thumbnailMenuButtonPlaceholder}
-                          onPress={() => showAccommodationActionMenu(accommodation)}
+                          onPress={() => handleDeleteAccommodation(accommodation)}
                           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
-                          <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.textSecondary} />
+                          <Ionicons name="trash" size={18} color={theme.colors.textSecondary} />
                         </TouchableOpacity>
                       </View>
                     );
@@ -805,6 +888,66 @@ const StepDetailScreen: React.FC = () => {
   };
 
   /**
+   * Supprimer une activité avec confirmation
+   */
+  const handleDeleteActivity = (activity: any) => {
+    if (!activity?._id || !step?._id) {
+      Alert.alert('Erreur', 'Impossible de supprimer cette activité');
+      return;
+    }
+
+    Alert.alert(
+      'Supprimer l\'activité',
+      `Êtes-vous sûr de vouloir supprimer "${activity.name || 'cette activité'}" ?\n\nCette action est irréversible.`,
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel'
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // TODO: Implémenter la suppression via hook
+              console.log('🗑️ Suppression activity:', {
+                stepId: step._id,
+                activityId: activity._id,
+                name: activity.name
+              });
+              
+              // Placeholder pour l'implémentation de la suppression
+              Alert.alert('À implémenter', 'Suppression d\'activité - fonctionnalité à venir');
+            } catch (error) {
+              console.error('Erreur suppression activity:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer l\'activité');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  /**
+   * Éditer une activité
+   */
+  const handleEditActivity = (activity: any) => {
+    if (!activity?._id || !step?._id) {
+      Alert.alert('Erreur', 'Impossible d\'éditer cette activité');
+      return;
+    }
+    
+    console.log('📝 Navigation vers édition activity:', {
+      stepId: step._id,
+      activityId: activity._id,
+      name: activity.name
+    });
+    
+    // TODO: Implémenter navigation vers EditActivity
+    Alert.alert('À implémenter', 'Édition d\'activité - fonctionnalité à venir');
+  };
+
+  /**
    * Rendu de l'onglet Activités
    */
   const renderActivitiesTab = () => {
@@ -837,14 +980,30 @@ const StepDetailScreen: React.FC = () => {
         })
         .map((activity: any, index: number) => (
           <View key={activity._id || index} style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}>
-            {/* Thumbnail de l'activité - sécurisé */}
-            {activity && (
-              <SafeImage 
-                thumbnail={activity.thumbnail || null}
+            {/* Thumbnail de l'activité - cliquable pour édition */}
+            <View style={styles.thumbnailContainer}>
+              <TouchableOpacity 
+                onPress={() => handleEditActivity(activity)}
+                activeOpacity={0.8}
                 style={styles.itemImage}
-                placeholderIcon="walk-outline"
-              />
-            )}
+              >
+                {activity && (
+                  <SafeImage 
+                    thumbnail={activity.thumbnail || null}
+                    style={styles.itemImage}
+                    placeholderIcon="walk-outline"
+                  />
+                )}
+              </TouchableOpacity>
+              {/* Bouton supprimer */}
+              <TouchableOpacity 
+                style={styles.thumbnailMenuButton}
+                onPress={() => handleDeleteActivity(activity)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="trash" size={18} color="white" />
+              </TouchableOpacity>
+            </View>
             
             <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
           {activity.name || `Activité ${index + 1}`}

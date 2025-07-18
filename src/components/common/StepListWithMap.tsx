@@ -314,6 +314,7 @@ export const StepListWithMap: React.FC<StepListWithMapProps> = ({
                   description={step.location?.address}
                   pinColor={colors.primary}
                   onPress={() => handleMarkerPress(step)}
+                  tracksViewChanges={false} // ✅ CRITIQUE: Évite le scintillement
                 />
               ))}
             </MapView>
