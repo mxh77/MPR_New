@@ -487,3 +487,4 @@ export const GooglePlacesInput: React.FC<GooglePlacesInputProps> = ({
 };
 
 export default GooglePlacesInput;
+export type { GooglePlacePrediction };

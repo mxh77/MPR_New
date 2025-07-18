@@ -72,9 +72,9 @@ export default class Activity extends BaseModel {
       phone: this.phone,
       algoliaTrailId: this.algoliaTrailId,
       syncStatus: this.customSyncStatus as any,
-      lastSyncAt: this.lastSyncAt,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt,
+      lastSyncAt: this.lastSyncAt ? new Date(this.lastSyncAt) : undefined,
+      createdAt: new Date(this.createdAt),
+      updatedAt: new Date(this.updatedAt),
     };
   }
 }

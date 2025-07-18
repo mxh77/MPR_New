@@ -1,6 +1,7 @@
 /**
- * Écran d'édition d'un accommodation avec interface moderne
+ * Écran d'édition d'une activité avec interface moderne
  * Pattern offline-first conforme aux instructions Copilot
+ * Architecture reprise de EditAccommodationScreen.tsx
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import {
@@ -21,8 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme, useDataRefresh } from '../../contexts';
-import { useAccommodationDetail } from '../../hooks/useAccommodationDetail';
-import { useAccommodationUpdate } from '../../hooks/useAccommodationUpdate';
+import { useActivityDetail_new } from '../../hooks/useActivityDetail';
+import { useActivityUpdate_new } from '../../hooks/useActivityUpdate';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { parseISODate } from '../../utils';
 import { colors } from '../../constants/colors';
@@ -32,14 +33,14 @@ import { GooglePlacesInput, ThumbnailPicker, CustomDateTimeRow } from '../../com
 // TYPES
 // ==========================================
 
-type EditAccommodationScreenNavigationProp = NativeStackNavigationProp<
+type EditActivityScreenNavigationProp = NativeStackNavigationProp<
   RoadtripsStackParamList,
-  'EditAccommodation'
+  'EditActivity'
 >;
 
 interface RouteParams {
   stepId: string;
-  accommodationId: string;
+  activityId: string;
 }
 
 // ==========================================
@@ -56,7 +57,8 @@ const CustomTextInput = React.memo(({
   placeholder,
   multiline = false,
   icon,
-  styles
+  styles,
+  keyboardType = 'default'
 }: {
   label: string;
   value: string;
@@ -65,6 +67,7 @@ const CustomTextInput = React.memo(({
   multiline?: boolean;
   icon: keyof typeof Ionicons.glyphMap;
   styles: any;
+  keyboardType?: any;
 }) => {
   return (
     <View style={styles.inputContainer}>
@@ -83,37 +86,95 @@ const CustomTextInput = React.memo(({
         placeholderTextColor={colors.gray500}
         multiline={multiline}
         numberOfLines={multiline ? 4 : 1}
+        keyboardType={keyboardType}
       />
     </View>
   );
 });
 CustomTextInput.displayName = 'CustomTextInput';
 
+/**
+ * Composant de sélecteur de type d'activité - EXTRAIT
+ */
+const ActivityTypeSelector = React.memo(({
+  value,
+  onValueChange,
+  styles
+}: {
+  value: string;
+  onValueChange: (value: string) => void;
+  styles: any;
+}) => {
+  const activityTypes = [
+    { value: 'Randonnée', label: 'Randonnée', icon: 'walk' },
+    { value: 'Visite', label: 'Visite', icon: 'camera' },
+    { value: 'Restaurant', label: 'Restaurant', icon: 'restaurant' },
+    { value: 'Transport', label: 'Transport', icon: 'car' },
+    { value: 'Courses', label: 'Courses', icon: 'bag' },
+    { value: 'Autre', label: 'Autre', icon: 'ellipsis-horizontal' },
+  ];
+
+  return (
+    <View style={styles.inputContainer}>
+      <View style={styles.inputHeader}>
+        <Ionicons name="list" size={20} color={colors.primary} />
+        <Text style={styles.inputLabel}>Type d'activité</Text>
+      </View>
+      <View style={styles.typeGrid}>
+        {activityTypes.map((type) => (
+          <TouchableOpacity
+            key={type.value}
+            style={[
+              styles.typeButton,
+              value === type.value && styles.typeButtonSelected
+            ]}
+            onPress={() => onValueChange(type.value)}
+          >
+            <Ionicons
+              name={type.icon as any}
+              size={20}
+              color={value === type.value ? colors.white : colors.gray600}
+            />
+            <Text style={[
+              styles.typeButtonText,
+              value === type.value && styles.typeButtonTextSelected
+            ]}>
+              {type.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+});
+ActivityTypeSelector.displayName = 'ActivityTypeSelector';
+
 // ==========================================
 // COMPOSANT PRINCIPAL
 // ==========================================
 
-export const EditAccommodationScreen: React.FC = () => {
-  const navigation = useNavigation<EditAccommodationScreenNavigationProp>();
+export const EditActivityScreen_new: React.FC = () => {
+  const navigation = useNavigation<EditActivityScreenNavigationProp>();
   const route = useRoute();
-  const { stepId, accommodationId } = route.params as RouteParams;
+  const { stepId, activityId } = route.params as RouteParams;
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { notifyStepUpdate } = useDataRefresh();
 
   // Hooks métier
-  const { accommodation, loading, error: loadError, refreshAccommodationDetail } = useAccommodationDetail(stepId, accommodationId);
-  const { updating, error: updateError, updateAccommodationData } = useAccommodationUpdate();
+  const { activity, loading, error: loadError, refreshActivityDetail } = useActivityDetail_new(stepId, activityId);
+  const { updating, error: updateError, updateActivityData } = useActivityUpdate_new();
 
-  // État du formulaire
+  // État du formulaire - Basé sur le modèle backend Activity
   const [name, setName] = useState('');
+  const [type, setType] = useState<'Randonnée' | 'Courses' | 'Visite' | 'Transport' | 'Restaurant' | 'Autre'>('Randonnée');
   const [address, setAddress] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
-  const [checkInDate, setCheckInDate] = useState('');
-  const [checkInTime, setCheckInTime] = useState('');
-  const [checkOutDate, setCheckOutDate] = useState('');
-  const [checkOutTime, setCheckOutTime] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [thumbnail, setThumbnail] = useState<string | null>(null);
@@ -121,77 +182,80 @@ export const EditAccommodationScreen: React.FC = () => {
   const [website, setWebsite] = useState('');
   const [reservationNumber, setReservationNumber] = useState('');
   const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState('EUR');
-  const [nights, setNights] = useState('1');
+  const [currency, setCurrency] = useState<'USD' | 'CAD' | 'EUR'>('EUR');
+  const [duration, setDuration] = useState('');
+  const [typeDuration, setTypeDuration] = useState<'M' | 'H' | 'J'>('H');
+  const [trailDistance, setTrailDistance] = useState('');
+  const [trailElevation, setTrailElevation] = useState('');
+  const [trailType, setTrailType] = useState('');
 
   /**
    * Chargement initial avec useFocusEffect - Pattern sécurisé selon instructions Copilot
    */
   useFocusEffect(
     useCallback(() => {
-      console.log('� EditAccommodationScreen - useFocusEffect déclenché:', {
-        hasAccommodation: !!accommodation,
+      console.log('🚶 EditActivityScreen_new - useFocusEffect déclenché:', {
+        hasActivity: !!activity,
         loading,
         error: !!loadError
       });
 
       // Conditions strictes pour éviter les appels multiples
-      if (!accommodation && !loading && !loadError) {
-        console.log('🔧 EditAccommodationScreen - Chargement initial des détails');
-        refreshAccommodationDetail();
+      if (!activity && !loading && !loadError) {
+        console.log('🔧 EditActivityScreen_new - Chargement initial des détails');
+        refreshActivityDetail();
       } else {
-        console.log('🔧 EditAccommodationScreen - Chargement ignoré:', {
-          hasAccommodation: !!accommodation,
+        console.log('🔧 EditActivityScreen_new - Chargement ignoré:', {
+          hasActivity: !!activity,
           loading,
           hasError: !!loadError,
           reason: 'conditions non remplies'
         });
       }
-    }, [accommodation, loading, loadError, refreshAccommodationDetail]) // Dépendances minimales
+    }, [activity, loading, loadError, refreshActivityDetail]) // Dépendances minimales
   );
 
   /**
-   * Remplissage du formulaire quand l'accommodation est chargé
+   * Remplissage du formulaire quand l'activity est chargé
    */
   useEffect(() => {
-    if (accommodation) {
-      console.log('🏨 EditAccommodationScreen - Remplissage du formulaire:', accommodation.name);
+    if (activity) {
+      console.log('🚶 EditActivityScreen_new - Remplissage du formulaire:', activity.name);
 
-      setName(accommodation.name || '');
-      setAddress(accommodation.address || '');
-      setLatitude(accommodation.latitude || null);
-      setLongitude(accommodation.longitude || null);
+      setName(activity.name || '');
+      setType(activity.type || 'Randonnée');
+      setAddress(activity.address || '');
+      setLatitude(activity.latitude || null);
+      setLongitude(activity.longitude || null);
 
-      // Dates d'arrivée (check-in)
-      if (accommodation.startDateTime || accommodation.arrivalDateTime) {
-        const checkInDateStr = accommodation.startDateTime || accommodation.arrivalDateTime;
-        const checkInParsed = parseISODate(checkInDateStr);
-        if (checkInParsed) {
-          setCheckInDate(checkInParsed.toISOString().split('T')[0]); // YYYY-MM-DD
-          setCheckInTime(checkInParsed.toISOString().split('T')[1].substring(0, 5)); // HH:MM
+      // Dates de début (start)
+      if (activity.startDateTime) {
+        const startParsed = parseISODate(activity.startDateTime);
+        if (startParsed) {
+          setStartDate(startParsed.toISOString().split('T')[0]); // YYYY-MM-DD
+          setStartTime(startParsed.toISOString().split('T')[1].substring(0, 5)); // HH:MM
         }
       }
 
-      // Dates de départ (check-out)
-      if (accommodation.endDateTime || accommodation.departureDateTime) {
-        const checkOutDateStr = accommodation.endDateTime || accommodation.departureDateTime;
-        const checkOutParsed = parseISODate(checkOutDateStr);
-        if (checkOutParsed) {
-          setCheckOutDate(checkOutParsed.toISOString().split('T')[0]); // YYYY-MM-DD
-          setCheckOutTime(checkOutParsed.toISOString().split('T')[1].substring(0, 5)); // HH:MM
+      // Dates de fin (end)
+      if (activity.endDateTime) {
+        const endParsed = parseISODate(activity.endDateTime);
+        if (endParsed) {
+          setEndDate(endParsed.toISOString().split('T')[0]); // YYYY-MM-DD
+          setEndTime(endParsed.toISOString().split('T')[1].substring(0, 5)); // HH:MM
         }
       }
 
-      setWebsite(accommodation.website || accommodation.url || '');
-      setPhone(accommodation.phone || '');
-      setNotes(accommodation.notes || '');
+      setWebsite(activity.website || activity.url || '');
+      setPhone(activity.phone || '');
+      setNotes(activity.notes || '');
 
       // Gestion de la thumbnail : peut être string ou objet avec { url, type, name, fileId, createdAt }
-      if (accommodation.thumbnail) {
-        if (typeof accommodation.thumbnail === 'string') {
-          setThumbnail(accommodation.thumbnail);
-        } else if (accommodation.thumbnail.url) {
-          setThumbnail(accommodation.thumbnail.url);
+      if (activity.thumbnail) {
+        if (typeof activity.thumbnail === 'string') {
+          setThumbnail(activity.thumbnail);
+        } else if (activity.thumbnail.url) {
+          setThumbnail(activity.thumbnail.url);
         } else {
           setThumbnail(null);
         }
@@ -199,21 +263,25 @@ export const EditAccommodationScreen: React.FC = () => {
         setThumbnail(null);
       }
 
-      // Champs MongoDB complets
-      setEmail(accommodation.email || '');
-      setWebsite(accommodation.website || '');
-      setReservationNumber(accommodation.reservationNumber || '');
-      setPrice(accommodation.price?.toString() || '');
-      setCurrency(accommodation.currency || 'EUR');
-      setNights(accommodation.nights?.toString() || '1');
+      // Champs MongoDB complets spécifiques aux activités
+      setEmail(activity.email || '');
+      setWebsite(activity.website || '');
+      setReservationNumber(activity.reservationNumber || '');
+      setPrice(activity.price?.toString() || '');
+      setCurrency(activity.currency || 'EUR');
+      setDuration(activity.duration?.toString() || '');
+      setTypeDuration(activity.typeDuration || 'H');
+      setTrailDistance(activity.trailDistance?.toString() || '');
+      setTrailElevation(activity.trailElevation?.toString() || '');
+      setTrailType(activity.trailType || '');
     }
-  }, [accommodation]);
+  }, [activity]);
 
   /**
    * Gestion de la sélection d'adresse via Google Places
    */
   const handlePlaceSelected = useCallback((place: any) => {
-    console.log('📍 EditAccommodationScreen - Lieu sélectionné:', place.description);
+    console.log('📍 EditActivityScreen_new - Lieu sélectionné:', place.description);
 
     setAddress(place.description);
 
@@ -238,42 +306,46 @@ export const EditAccommodationScreen: React.FC = () => {
    */
   const handleSave = useCallback(async () => {
     if (!name.trim()) {
-      Alert.alert('Erreur', 'Le nom de l\'hébergement est obligatoire');
+      Alert.alert('Erreur', 'Le nom de l\'activité est obligatoire');
       return;
     }
 
-    console.log('💾 EditAccommodationScreen - Début sauvegarde');
+    console.log('💾 EditActivityScreen_new - Début sauvegarde');
 
     // Construction des données à sauvegarder
-    const checkInDateTime = buildDateTime(checkInDate, checkInTime);
-    const checkOutDateTime = buildDateTime(checkOutDate, checkOutTime);
+    const startDateTime = buildDateTime(startDate, startTime);
+    const endDateTime = buildDateTime(endDate, endTime);
 
-    console.log('🖼️ EditAccommodationScreen - Thumbnail debug:', {
+    console.log('🖼️ EditActivityScreen_new - Thumbnail debug:', {
       originalThumbnail: thumbnail,
       hasThumbnail: !!thumbnail,
       willUpload: !!thumbnail
     });
 
-    const accommodationData = {
+    const activityData = {
       name: name.trim(),
+      type,
       address: address.trim(),
       latitude,
       longitude,
-      // CORRECTION: Utiliser les bons noms de champs MongoDB
-      arrivalDateTime: checkInDateTime || null,
-      departureDateTime: checkOutDateTime || null,
+      startDateTime: startDateTime || null,
+      endDateTime: endDateTime || null,
+      duration: duration ? parseInt(duration) : null,
+      typeDuration,
       phone: phone.trim() || null,
       email: email.trim() || null,
       website: website.trim() || null,
       reservationNumber: reservationNumber.trim() || null,
       price: price ? parseFloat(price) : null,
       currency: currency || 'EUR',
-      nights: nights ? parseInt(nights) : null,
+      trailDistance: trailDistance ? parseFloat(trailDistance) : null,
+      trailElevation: trailElevation ? parseFloat(trailElevation) : null,
+      trailType: trailType.trim() || null,
       notes: notes.trim() || null,
       thumbnail: thumbnail, // Passer l'URI directement pour upload multipart
     };
 
-    const result = await updateAccommodationData(stepId, accommodationId, accommodationData);
+    const result = await updateActivityData(stepId, activityId, activityData);
 
     if (result) {
       // Sauvegarde locale réussie - Alert succès IMMÉDIAT
@@ -291,13 +363,14 @@ export const EditAccommodationScreen: React.FC = () => {
       Alert.alert('Erreur', updateError || 'Erreur lors de la sauvegarde');
     }
   }, [
-    name, address, latitude, longitude,
-    checkInDate, checkInTime, checkOutDate, checkOutTime,
+    name, type, address, latitude, longitude,
+    startDate, startTime, endDate, endTime,
     phone, notes, thumbnail,
-    stepId, accommodationId, updateAccommodationData, updateError,
+    stepId, activityId, updateActivityData, updateError,
     notifyStepUpdate, navigation, buildDateTime,
-    // Champs MongoDB complets
-    email, website, reservationNumber, price, currency, nights
+    // Champs MongoDB complets spécifiques aux activités
+    email, website, reservationNumber, price, currency, duration, typeDuration,
+    trailDistance, trailElevation, trailType
   ]);
 
   // Styles
@@ -531,6 +604,78 @@ export const EditAccommodationScreen: React.FC = () => {
       marginLeft: 4,
       fontWeight: '500',
     },
+    // Styles pour le type grid
+    typeGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    typeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    typeButtonSelected: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    typeButtonText: {
+      fontSize: 14,
+      color: theme.colors.text,
+      marginLeft: 6,
+    },
+    typeButtonTextSelected: {
+      color: colors.white,
+    },
+    // Styles pour les rangées flexibles
+    rowContainer: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    flexInput: {
+      flex: 1,
+    },
+    // Styles pour durée
+    durationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    durationInput: {
+      flex: 1,
+    },
+    durationTypeSelector: {
+      flexDirection: 'row',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 8,
+      overflow: 'hidden',
+    },
+    durationTypeButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: theme.colors.surface,
+      borderRightWidth: 1,
+      borderRightColor: theme.colors.border,
+    },
+    durationTypeButtonSelected: {
+      backgroundColor: colors.primary,
+    },
+    durationTypeText: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: theme.colors.text,
+    },
+    durationTypeTextSelected: {
+      color: 'white',
+    },
   });
 
   // État de chargement
@@ -543,7 +688,7 @@ export const EditAccommodationScreen: React.FC = () => {
             <TouchableOpacity onPress={() => navigation.goBack()}>
               <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Édition hébergement</Text>
+            <Text style={styles.headerTitle}>Édition activité</Text>
           </View>
         </View>
         <View style={styles.loadingContainer}>
@@ -564,13 +709,13 @@ export const EditAccommodationScreen: React.FC = () => {
             <TouchableOpacity onPress={() => navigation.goBack()}>
               <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Édition hébergement</Text>
+            <Text style={styles.headerTitle}>Édition activité</Text>
           </View>
         </View>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color="#dc3545" />
           <Text style={styles.errorText}>{loadError}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => refreshAccommodationDetail(true)}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refreshActivityDetail(true)}>
             <Text style={styles.retryButtonText}>Réessayer</Text>
           </TouchableOpacity>
         </View>
@@ -589,7 +734,7 @@ export const EditAccommodationScreen: React.FC = () => {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Édition hébergement</Text>
+          <Text style={styles.headerTitle}>Édition activité</Text>
         </View>
 
         <TouchableOpacity
@@ -627,11 +772,17 @@ export const EditAccommodationScreen: React.FC = () => {
             </Text>
 
             <CustomTextInput
-              label="Nom de l'hébergement"
+              label="Nom de l'activité"
               value={name}
               onChangeText={setName}
-              placeholder="Ex: Hôtel du Centre"
-              icon="business"
+              placeholder="Ex: Randonnée du Mont Blanc"
+              icon="walk"
+              styles={styles}
+            />
+
+            <ActivityTypeSelector
+              value={type}
+              onValueChange={(value) => setType(value as any)}
               styles={styles}
             />
           </View>
@@ -657,53 +808,179 @@ export const EditAccommodationScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Section Dates */}
+          {/* Section Horaires */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              <Ionicons name="calendar" size={20} color={colors.primary} style={styles.sectionIcon} />
-              Dates de séjour
+              <Ionicons name="time" size={20} color={colors.primary} style={styles.sectionIcon} />
+              Horaires d'activité
             </Text>
 
             <CustomDateTimeRow
-              label="Check-in"
-              dateValue={checkInDate}
-              timeValue={checkInTime}
-              onDateChange={setCheckInDate}
-              onTimeChange={setCheckInTime}
-              icon="log-in"
+              label="Début"
+              dateValue={startDate}
+              timeValue={startTime}
+              onDateChange={setStartDate}
+              onTimeChange={setStartTime}
+              icon="play"
               styles={styles}
             />
 
             <CustomDateTimeRow
-              label="Check-out"
-              dateValue={checkOutDate}
-              timeValue={checkOutTime}
-              onDateChange={setCheckOutDate}
-              onTimeChange={setCheckOutTime}
-              icon="log-out"
+              label="Fin"
+              dateValue={endDate}
+              timeValue={endTime}
+              onDateChange={setEndDate}
+              onTimeChange={setEndTime}
+              icon="stop"
               styles={styles}
             />
+
+            {/* Durée */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputHeader}>
+                <Ionicons name="timer-outline" size={20} color={colors.primary} />
+                <Text style={styles.inputLabel}>Durée estimée</Text>
+              </View>
+              <View style={styles.durationRow}>
+                <RNTextInput
+                  style={[styles.textInput, styles.durationInput]}
+                  value={duration}
+                  onChangeText={setDuration}
+                  placeholder="Ex: 4"
+                  placeholderTextColor={colors.gray500}
+                  keyboardType="numeric"
+                />
+                <View style={styles.durationTypeSelector}>
+                  <TouchableOpacity
+                    style={[styles.durationTypeButton, typeDuration === 'M' && styles.durationTypeButtonSelected]}
+                    onPress={() => setTypeDuration('M')}
+                  >
+                    <Text style={[styles.durationTypeText, typeDuration === 'M' && styles.durationTypeTextSelected]}>Min</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.durationTypeButton, typeDuration === 'H' && styles.durationTypeButtonSelected]}
+                    onPress={() => setTypeDuration('H')}
+                  >
+                    <Text style={[styles.durationTypeText, typeDuration === 'H' && styles.durationTypeTextSelected]}>H</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.durationTypeButton, typeDuration === 'J' && styles.durationTypeButtonSelected]}
+                    onPress={() => setTypeDuration('J')}
+                  >
+                    <Text style={[styles.durationTypeText, typeDuration === 'J' && styles.durationTypeTextSelected]}>J</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
           </View>
 
-          {/* Section Détails */}
+          {/* Section Randonnée spécifique */}
+          {type === 'Randonnée' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                <Ionicons name="trail-sign" size={20} color={colors.primary} style={styles.sectionIcon} />
+                Détails randonnée
+              </Text>
+
+              <View style={styles.rowContainer}>
+                <View style={styles.flexInput}>
+                  <CustomTextInput
+                    label="Distance (km)"
+                    value={trailDistance}
+                    onChangeText={setTrailDistance}
+                    placeholder="12.5"
+                    icon="map-outline"
+                    styles={styles}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.flexInput}>
+                  <CustomTextInput
+                    label="Dénivelé (m)"
+                    value={trailElevation}
+                    onChangeText={setTrailElevation}
+                    placeholder="850"
+                    icon="trending-up-outline"
+                    styles={styles}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <CustomTextInput
+                label="Type de randonnée"
+                value={trailType}
+                onChangeText={setTrailType}
+                placeholder="Ex: Boucle, Aller-retour, Traverse"
+                icon="trail-sign-outline"
+                styles={styles}
+              />
+            </View>
+          )}
+
+          {/* Section Contact & Réservation */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              <Ionicons name="star" size={20} color={colors.primary} style={styles.sectionIcon} />
-              Détails
+              <Ionicons name="call" size={20} color={colors.primary} style={styles.sectionIcon} />
+              Contact & Réservation
             </Text>
+
+            <View style={styles.rowContainer}>
+              <View style={styles.flexInput}>
+                <CustomTextInput
+                  label="Téléphone"
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="+33 1 23 45 67 89"
+                  icon="call"
+                  styles={styles}
+                  keyboardType="phone-pad"
+                />
+              </View>
+              <View style={styles.flexInput}>
+                <CustomTextInput
+                  label="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="contact@exemple.com"
+                  icon="mail"
+                  styles={styles}
+                  keyboardType="email-address"
+                />
+              </View>
+            </View>
+
+            <CustomTextInput
+              label="Site web"
+              value={website}
+              onChangeText={setWebsite}
+              placeholder="https://..."
+              icon="globe"
+              styles={styles}
+              keyboardType="url"
+            />
+
+            <CustomTextInput
+              label="N° de réservation"
+              value={reservationNumber}
+              onChangeText={setReservationNumber}
+              placeholder="RES-123456"
+              icon="receipt-outline"
+              styles={styles}
+            />
 
             {/* Prix avec currency */}
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
                 <Ionicons name="card-outline" size={20} color={colors.primary} />
-                <Text style={styles.inputLabel}>Prix total</Text>
+                <Text style={styles.inputLabel}>Prix</Text>
               </View>
               <View style={styles.priceRow}>
                 <RNTextInput
                   style={[styles.textInput, styles.priceInput]}
                   value={price}
                   onChangeText={setPrice}
-                  placeholder="Ex: 340"
+                  placeholder="Ex: 25"
                   placeholderTextColor={colors.gray500}
                   keyboardType="numeric"
                 />
@@ -729,33 +1006,6 @@ export const EditAccommodationScreen: React.FC = () => {
                 </View>
               </View>
             </View>
-
-            <CustomTextInput
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              placeholder="contact@hotel.com"
-              icon="mail"
-              styles={styles}
-            />
-
-            <CustomTextInput
-              label="Site web"
-              value={website}
-              onChangeText={setWebsite}
-              placeholder="https://..."
-              icon="globe"
-              styles={styles}
-            />
-
-            <CustomTextInput
-              label="Téléphone"
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+33 1 23 45 67 89"
-              icon="call"
-              styles={styles}
-            />
           </View>
 
           {/* Section Image */}
@@ -768,7 +1018,7 @@ export const EditAccommodationScreen: React.FC = () => {
             <ThumbnailPicker
               value={thumbnail}
               onImageSelected={setThumbnail}
-              label="Photo de l'hébergement"
+              label="Photo de l'activité"
             />
           </View>
 
@@ -796,4 +1046,4 @@ export const EditAccommodationScreen: React.FC = () => {
   );
 };
 
-export default EditAccommodationScreen;
+export default EditActivityScreen_new;

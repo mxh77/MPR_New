@@ -10,6 +10,7 @@ import { StepsListScreen } from '../../screens';
 import StepDetailScreen from '../../screens/steps/StepDetailScreen';
 import EditStepScreen from '../../screens/steps/EditStepScreen';
 import EditAccommodationScreen from '../../screens/accommodations/EditAccommodationScreen';
+import EditActivityScreen from '../../screens/activities/EditActivityScreen';
 
 // Types pour la navigation roadtrips
 export type RoadtripsStackParamList = {
@@ -33,6 +34,10 @@ export type RoadtripsStackParamList = {
     stepId: string;
     accommodationId: string;
   };
+  EditActivity: {
+    stepId: string;
+    activityId: string;
+  };
 };
 
 const RoadtripsStack = createNativeStackNavigator<RoadtripsStackParamList>();
@@ -55,6 +60,7 @@ export const RoadtripsNavigator: React.FC = () => {
       <RoadtripsStack.Screen name="StepDetail" component={StepDetailScreen} />
       <RoadtripsStack.Screen name="EditStep" component={EditStepScreen} />
       <RoadtripsStack.Screen name="EditAccommodation" component={EditAccommodationScreen} />
+      <RoadtripsStack.Screen name="EditActivity" component={EditActivityScreen} />
     </RoadtripsStack.Navigator>
   );
 };

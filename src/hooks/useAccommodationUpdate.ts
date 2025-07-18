@@ -26,11 +26,11 @@ const isValidObjectId = (id: string): boolean => {
  */
 const updateAccommodationInLocal = async (stepId: string, accommodationId: string, accommodationData: any): Promise<any> => {
   return await database.write(async () => {
-      const stepsCollection = database.get<StepModel>('steps');
-    
+    const stepsCollection = database.get<StepModel>('steps');
+
     try {
       let existingStep: StepModel;
-      
+
       try {
         existingStep = await stepsCollection.find(stepId);
       } catch (directFindError) {
@@ -38,11 +38,11 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
         const stepsFound = await stepsCollection
           .query(Q.where('id', stepId))
           .fetch();
-        
+
         if (stepsFound.length === 0) {
           throw new Error(`Step avec ID ${stepId} non trouvé en local`);
         }
-        
+
         existingStep = stepsFound[0];
       }
 
@@ -54,7 +54,7 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
         accommodationsJsonType: typeof (existingStep as any).accommodationsJson,
         accommodationsRelation: (existingStep as any).accommodations,
         accommodationsRelationType: typeof (existingStep as any).accommodations,
-        allFields: Object.keys(existingStep._raw || {}).filter(key => 
+        allFields: Object.keys(existingStep._raw || {}).filter(key =>
           key.includes('accommodat') || key.includes('activit')
         )
       });      // Récupérer les accommodations actuels
@@ -70,7 +70,7 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
           valueLength: accommodationsRaw?.length,
           valueKeys: typeof accommodationsRaw === 'object' ? Object.keys(accommodationsRaw || {}) : 'N/A'
         });
-        
+
         if (typeof accommodationsRaw === 'string') {
           accommodations = JSON.parse(accommodationsRaw);
         } else if (Array.isArray(accommodationsRaw)) {
@@ -93,7 +93,7 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
         const accId = acc._id?.toString() || acc._id;
         return accId === accommodationId;
       });
-      
+
       console.log('🔍 useAccommodationUpdate - Recherche accommodation:', {
         accommodationId,
         accommodationsCount: accommodations.length,
@@ -103,10 +103,10 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
           name: acc.name
         }))
       });
-      
+
       if (accommodationIndex === -1) {
         console.warn('⚠️ useAccommodationUpdate - Accommodation non trouvé, tentative de création...');
-        
+
         // Créer l'accommodation s'il n'existe pas
         const newAccommodation = {
           _id: accommodationId,
@@ -114,15 +114,15 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
-        
+
         accommodations.push(newAccommodation);
-        
+
         console.log('✅ useAccommodationUpdate - Accommodation créé:', {
           accommodationId,
           name: accommodationData.name,
           totalAccommodations: accommodations.length
         });
-        
+
         // L'index est maintenant le dernier élément
         const newAccommodationIndex = accommodations.length - 1;
       } else {
@@ -132,7 +132,7 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
           originalData: accommodations[accommodationIndex],
           newData: accommodationData
         });
-        
+
         accommodations[accommodationIndex] = {
           ...accommodations[accommodationIndex],
           ...accommodationData,
@@ -159,28 +159,28 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
       console.log('🔧 useAccommodationUpdate - Début mise à jour step en base');
       await existingStep.update((step: StepModel) => {
         console.log('🔧 useAccommodationUpdate - Dans closure update');
-        
+
         // PATTERN DEBUG: _setRaw explicite champ par champ pour debugging
         console.log('🔧 useAccommodationUpdate - _setRaw accommodationsJson...');
         step._setRaw('accommodations', preparedData.accommodationsJsonValue);
-        
+
         console.log('🔧 useAccommodationUpdate - _setRaw sync_status...');
         step._setRaw('sync_status', preparedData.syncStatusValue);
-        
+
         console.log('🔧 useAccommodationUpdate - _setRaw last_sync_at...');
         step._setRaw('last_sync_at', preparedData.lastSyncAtValue);
-        
+
         console.log('🔧 useAccommodationUpdate - _setRaw updated_at...');
         step._setRaw('updated_at', preparedData.updatedAtValue);
-        
+
         console.log('🔧 useAccommodationUpdate - Fin closure update');
       });
       console.log('🔧 useAccommodationUpdate - Fin mise à jour step en base');
 
       console.log('✅ useAccommodationUpdate - Accommodation mis à jour en local:', accommodationData.name);
-      
+
       return accommodations[finalAccommodationIndex];
-      
+
     } catch (error) {
       console.error('❌ useAccommodationUpdate - Échec mise à jour locale:', error);
       throw error;
@@ -194,7 +194,7 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
 const syncAccommodationWithAPI = async (accommodationId: string, accommodationData: any): Promise<void> => {
   try {
     console.log('🔄 useAccommodationUpdate - Début sync API pour accommodation:', accommodationId);
-    
+
     // Préparer les données pour l'API accommodation
     const updateData = {
       name: accommodationData.name,
@@ -227,22 +227,22 @@ const syncAccommodationWithAPI = async (accommodationId: string, accommodationDa
 
     // Appel API pour mettre à jour l'accommodation spécifique
     const updatedAccommodation = await updateAccommodation(accommodationId, updateData);
-    
+
     if (updatedAccommodation) {
       // Mettre à jour le statut de sync en local pour le step
       const stepsCollection = database.get<StepModel>('steps');
       const steps = await stepsCollection.query().fetch();
-      
+
       // Trouver le step qui contient cet accommodation
       for (const step of steps) {
         const accommodationsRaw = (step as any).accommodationsJson;
         if (accommodationsRaw) {
           try {
             const accommodations = JSON.parse(accommodationsRaw);
-            const hasAccommodation = accommodations.some((acc: any) => 
+            const hasAccommodation = accommodations.some((acc: any) =>
               (acc._id?.toString() || acc._id) === accommodationId
             );
-            
+
             if (hasAccommodation) {
               await database.write(async () => {
                 await step.update((s: StepModel) => {
@@ -257,27 +257,27 @@ const syncAccommodationWithAPI = async (accommodationId: string, accommodationDa
           }
         }
       }
-      
+
       console.log('✅ useAccommodationUpdate - Sync API réussie pour accommodation:', accommodationId);
     }
 
   } catch (error) {
     console.error('❌ useAccommodationUpdate - Erreur sync API accommodation:', error);
-    
+
     // Marquer comme erreur de sync le step qui contient cet accommodation
     const stepsCollection = database.get<StepModel>('steps');
     try {
       const steps = await stepsCollection.query().fetch();
-      
+
       for (const step of steps) {
         const accommodationsRaw = (step as any).accommodationsJson;
         if (accommodationsRaw) {
           try {
             const accommodations = JSON.parse(accommodationsRaw);
-            const hasAccommodation = accommodations.some((acc: any) => 
+            const hasAccommodation = accommodations.some((acc: any) =>
               (acc._id?.toString() || acc._id) === accommodationId
             );
-            
+
             if (hasAccommodation) {
               await database.write(async () => {
                 await step.update((s: StepModel) => {
@@ -295,7 +295,7 @@ const syncAccommodationWithAPI = async (accommodationId: string, accommodationDa
     } catch (markError) {
       console.error('❌ useAccommodationUpdate - Erreur marquage sync error:', markError);
     }
-    
+
     // Ne pas propager l'erreur pour conserver l'expérience offline-first
     console.warn('⚠️ useAccommodationUpdate - Sync API échouée, données locales conservées');
   }
@@ -313,8 +313,8 @@ export const useAccommodationUpdate = (): UseAccommodationUpdateResult => {
    * Stratégie 2-phases: Sauvegarde locale immédiate, puis synchronisation API en arrière-plan
    */
   const updateAccommodationData = useCallback(async (
-    stepId: string, 
-    accommodationId: string, 
+    stepId: string,
+    accommodationId: string,
     data: any
   ): Promise<any | null> => {
     console.log('🏨 useAccommodationUpdate - Début mise à jour:', {
@@ -350,7 +350,7 @@ export const useAccommodationUpdate = (): UseAccommodationUpdateResult => {
       // PHASE 1: Sauvegarde locale IMMÉDIATE (bloquante)
       console.log('💾 PHASE 1: Sauvegarde locale immédiate');
       const updatedAccommodation = await updateAccommodationInLocal(stepId, accommodationId, data);
-      
+
       console.log('✅ PHASE 1 terminée - Accommodation sauvegardé localement');
 
       // PHASE 2: Synchronisation API en arrière-plan (non-bloquante)
