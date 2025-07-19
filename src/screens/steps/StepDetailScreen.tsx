@@ -105,6 +105,15 @@ const StepDetailScreen: React.FC = () => {
       isString: typeof thumbnail === 'string'
     });
 
+    // 🔍 DEBUG: Vérifier si l'URL est déjà corrompue à la réception
+    if (thumbnail?.url) {
+      console.log('🔍 DEBUG URL AVANT nettoyage:', {
+        originalUrl: thumbnail.url,
+        hasGGoogleAccessId: thumbnail.url.includes('GGoogleAccessId'),
+        hasCorrectGoogleAccessId: thumbnail.url.includes('GoogleAccessId') && !thumbnail.url.includes('GGoogleAccessId')
+      });
+    }
+
     if (!thumbnail) {
       console.log('🖼️ StepDetailScreen - getImageUri - thumbnail null/undefined');
       return null;
@@ -121,9 +130,15 @@ const StepDetailScreen: React.FC = () => {
     if (typeof thumbnail === 'object' && thumbnail !== null) {
       // PRIORITÉ 1: thumbnail.url (selon API)
       if (thumbnail.url && typeof thumbnail.url === 'string' && thumbnail.url.trim().length > 0) {
-        const uri = thumbnail.url.trim();
-        console.log('🖼️ StepDetailScreen - getImageUri - object.url (API):', uri);
-        return uri;
+        // SÉCURITÉ: Nettoyer l'URL pour éviter les corruptions
+        const cleanUrl = thumbnail.url.trim()
+          .replace(/^https?:\/\/storrage\./, 'https://storage.')  // Corriger "storrage" → "storage"
+          .replace(/^htttps:\/\//, 'https://')                    // Corriger "htttps" → "https"
+        // CORRECTION: Ne PAS appliquer le nettoyage GGoogleAccessId car l'URL est déjà propre
+        // .replace(/GGoogleAccessId/g, 'GoogleAccessId');         // DÉSACTIVÉ - causait la corruption
+
+        console.log('🖼️ StepDetailScreen - getImageUri - object.url (API):', cleanUrl);
+        return cleanUrl;
       }
 
       // PRIORITÉ 2: thumbnail.uri (fallback)
@@ -148,20 +163,47 @@ const StepDetailScreen: React.FC = () => {
    * Validation stricte de l'URI pour éviter les erreurs de casting
    */
   const isValidImageUri = (uri: any): uri is string => {
-    const isValid = typeof uri === 'string' && uri.length > 0 && (uri.startsWith('http') || uri.startsWith('file') || uri.startsWith('data:'));
-
-    if (!isValid) {
-      console.warn('🖼️ URI invalide détectée:', {
+    if (typeof uri !== 'string' || uri.length === 0) {
+      console.warn('🖼️ URI invalide - pas une string ou vide:', {
         uri,
         type: typeof uri,
         isString: typeof uri === 'string',
-        hasLength: uri?.length > 0,
-        startsWithHttp: uri?.startsWith?.('http'),
-        raw: JSON.stringify(uri)
+        hasLength: uri?.length > 0
       });
+      return false;
     }
 
-    return isValid;
+    // Vérifier que l'URI commence bien par un protocole valide
+    const hasValidProtocol = uri.startsWith('http://') || uri.startsWith('https://') ||
+      uri.startsWith('file://') || uri.startsWith('data:');
+
+    if (!hasValidProtocol) {
+      console.warn('🖼️ URI invalide - protocole invalide:', {
+        uri,
+        startsWithHttp: uri.startsWith('http'),
+        startsWithHttps: uri.startsWith('https'),
+        startsWithFile: uri.startsWith('file'),
+        startsWithData: uri.startsWith('data')
+      });
+      return false;
+    }
+
+    // Vérifier qu'il n'y a pas de caractères corrompus typiques
+    const hasCorruption = uri.includes('storrage.') ||      // "storrage" au lieu de "storage"
+      uri.includes('htttps://') ||      // "htttps" au lieu de "https"
+      uri.includes('GGoogleAccessId');  // "GGoogleAccessId" au lieu de "GoogleAccessId"
+
+    if (hasCorruption) {
+      console.warn('🖼️ URI détectée comme corrompue:', {
+        uri,
+        hasStorrage: uri.includes('storrage.'),
+        hasTripleT: uri.includes('htttps://'),
+        hasDoubleG: uri.includes('GGoogleAccessId')
+      });
+      return false;
+    }
+
+    return true;
   };
 
   /**
@@ -615,7 +657,7 @@ const StepDetailScreen: React.FC = () => {
      * Ouvrir dans Google Maps
      */
     const handleOpenMaps = (accommodation: any) => {
-      if (!accommodation.latitude || !accommodation.longitude) {
+      if (!accommodation.latitude || !accommodation.longitude || accommodation.latitude === 0 || accommodation.longitude === 0) {
         Alert.alert('Information', 'Aucune localisation définie pour cet hébergement');
         return;
       }
@@ -724,7 +766,8 @@ const StepDetailScreen: React.FC = () => {
                       {(() => {
                         const dateString = accommodation.startDateTime || accommodation.arrivalDateTime;
                         const date = parseISODate(dateString);
-                        return date ? formatDateWithoutTimezone(date) : 'N/A';
+                        const formatted = date ? formatDateWithoutTimezone(date) : 'N/A';
+                        return formatted || 'N/A';
                       })()}
                     </Text>
                   </View>
@@ -740,7 +783,8 @@ const StepDetailScreen: React.FC = () => {
                       {(() => {
                         const dateString = accommodation.endDateTime || accommodation.departureDateTime;
                         const date = parseISODate(dateString);
-                        return date ? formatDateWithoutTimezone(date) : 'N/A';
+                        const formatted = date ? formatDateWithoutTimezone(date) : 'N/A';
+                        return formatted || 'N/A';
                       })()}
                     </Text>
                   </View>
@@ -758,28 +802,47 @@ const StepDetailScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* Boutons d'action discrets - Icônes seulement */}
-                {(accommodation.url || (accommodation.latitude && accommodation.longitude)) && (
-                  <View style={styles.accommodationActionButtons}>
-                    {accommodation.url && (
-                      <TouchableOpacity
-                        style={styles.accommodationActionIcon}
-                        onPress={() => handleOpenWebsite(accommodation.url, accommodation.name)}
-                      >
-                        <Ionicons name="globe-outline" size={24} color={theme.colors.primary} />
-                      </TouchableOpacity>
-                    )}
+                {/* Bouton Site Web - Si disponible */}
+                {accommodation.url && (
+                  <View style={styles.activityActionButtons}>
+                    <TouchableOpacity
+                      style={styles.activityActionIcon}
+                      onPress={() => handleOpenWebsite(accommodation.url, accommodation.name)}
+                    >
+                      <Ionicons name="globe-outline" size={24} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {/* Bouton Google Maps - Si coordonnées disponibles */}
+                {(() => {
+                  // Validation robuste des coordonnées
+                  const hasValidCoordinates =
+                    accommodation.latitude &&
+                    accommodation.longitude &&
+                    typeof accommodation.latitude === 'number' &&
+                    typeof accommodation.longitude === 'number' &&
+                    accommodation.latitude !== 0 &&
+                    accommodation.longitude !== 0 &&
+                    !isNaN(accommodation.latitude) &&
+                    !isNaN(accommodation.longitude) &&
+                    Math.abs(accommodation.latitude) <= 90 &&
+                    Math.abs(accommodation.longitude) <= 180;
 
-                    {accommodation.latitude && accommodation.longitude && (
+                  if (!hasValidCoordinates) {
+                    return null; // Ne rien rendre si coordonnées invalides
+                  }
+
+                  return (
+                    <View style={styles.activityActionButtons}>
                       <TouchableOpacity
-                        style={styles.accommodationActionIcon}
+                        style={styles.activityActionIcon}
                         onPress={() => handleOpenMaps(accommodation)}
                       >
                         <Ionicons name="map-outline" size={24} color={theme.colors.primary} />
                       </TouchableOpacity>
-                    )}
-                  </View>
-                )}
+                    </View>
+                  );
+                })()}
               </View>
             ))
         ) : (
@@ -853,7 +916,7 @@ const StepDetailScreen: React.FC = () => {
             style: 'destructive',
             onPress: async () => {
               try {
-//TODO: Implémenter la suppression via hook
+                //TODO: Implémenter la suppression via hook
                 console.log('🗑️ Suppression activité:', {
                   stepId: step._id,
                   activityId: activity._id,
@@ -862,10 +925,10 @@ const StepDetailScreen: React.FC = () => {
 
                 // Placeholder pour l'implémentation de la suppression
                 Alert.alert('À implémenter', 'Suppression d\'activité - fonctionnalité à venir');
-              } catch (error) {   
+              } catch (error) {
                 console.error('Erreur suppression activité:', error);
                 Alert.alert('Erreur', 'Impossible de supprimer l\'activité');
-              } 
+              }
             }
           }
         ]
@@ -890,7 +953,7 @@ const StepDetailScreen: React.FC = () => {
      * Ouvrir dans Google Maps pour une activité
      */
     const handleOpenMaps = (activity: any) => {
-      if (!activity.latitude || !activity.longitude) {
+      if (!activity.latitude || !activity.longitude || activity.latitude === 0 || activity.longitude === 0) {
         Alert.alert('Information', 'Aucune localisation définie pour cette activité');
         return;
       }
@@ -993,13 +1056,14 @@ const StepDetailScreen: React.FC = () => {
                   </Text>
                 )}
 
+
                 {activity.address && (
                   <Text style={[styles.itemAddress, { color: theme.colors.textSecondary }]}>
                     {activity.address}
                   </Text>
                 )}
 
-                {/* Dates d'&activité - Style identique aux dates de l'onglet Infos */}
+                {/* Dates d'activité - Style identique aux dates de l'onglet Infos */}
                 {(activity.startDateTime || activity.arrivalDateTime) && (
                   <View style={styles.dateRow}>
                     <Ionicons name="log-in" size={16} color="#28a745" />
@@ -1010,7 +1074,8 @@ const StepDetailScreen: React.FC = () => {
                       {(() => {
                         const dateString = activity.startDateTime || activity.arrivalDateTime;
                         const date = parseISODate(dateString);
-                        return date ? formatDateWithoutTimezone(date) : 'N/A';
+                        const formatted = date ? formatDateWithoutTimezone(date) : 'N/A';
+                        return formatted || 'N/A';
                       })()}
                     </Text>
                   </View>
@@ -1026,7 +1091,8 @@ const StepDetailScreen: React.FC = () => {
                       {(() => {
                         const dateString = activity.endDateTime || activity.departureDateTime;
                         const date = parseISODate(dateString);
-                        return date ? formatDateWithoutTimezone(date) : 'N/A';
+                        const formatted = date ? formatDateWithoutTimezone(date) : 'N/A';
+                        return formatted || 'N/A';
                       })()}
                     </Text>
                   </View>
@@ -1044,29 +1110,48 @@ const StepDetailScreen: React.FC = () => {
                   </View>
                 )}
 
-
-                {/* Boutons d'action discrets - Icônes seulement */}
-                {(activity.url || (activity.latitude && activity.longitude)) && (
+                {/* Bouton Site Web - Si disponible */}
+                {activity.url && (
                   <View style={styles.activityActionButtons}>
-                    {activity.url && (
-                      <TouchableOpacity
-                        style={styles.activityActionIcon}
-                        onPress={() => handleOpenWebsite(activity.url, activity.name)}
-                      >
-                        <Ionicons name="globe-outline" size={24} color={theme.colors.primary} />
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      style={styles.activityActionIcon}
+                      onPress={() => handleOpenWebsite(activity.url, activity.name)}
+                    >
+                      <Ionicons name="globe-outline" size={24} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
 
-                    {activity.latitude && activity.longitude && (
+                {/* Bouton Google Maps - Si coordonnées disponibles */}
+                {(() => {
+                  // Validation robuste des coordonnées
+                  const hasValidCoordinates =
+                    activity.latitude &&
+                    activity.longitude &&
+                    typeof activity.latitude === 'number' &&
+                    typeof activity.longitude === 'number' &&
+                    activity.latitude !== 0 &&
+                    activity.longitude !== 0 &&
+                    !isNaN(activity.latitude) &&
+                    !isNaN(activity.longitude) &&
+                    Math.abs(activity.latitude) <= 90 &&
+                    Math.abs(activity.longitude) <= 180;
+
+                  if (!hasValidCoordinates) {
+                    return null; // Ne rien rendre si coordonnées invalides
+                  }
+
+                  return (
+                    <View style={styles.activityActionButtons}>
                       <TouchableOpacity
                         style={styles.activityActionIcon}
                         onPress={() => handleOpenMaps(activity)}
                       >
                         <Ionicons name="map-outline" size={24} color={theme.colors.primary} />
                       </TouchableOpacity>
-                    )}
-                  </View>
-                )}
+                    </View>
+                  );
+                })()}
               </View>
             ))
         ) : (
@@ -1208,7 +1293,7 @@ const StepDetailScreen: React.FC = () => {
               },
               // Marqueurs pour les hébergements (lit vert)
               ...accommodations
-                .filter((acc: any) => acc.latitude && acc.longitude)
+                .filter((acc: any) => acc.latitude && acc.longitude && acc.latitude !== 0 && acc.longitude !== 0)
                 .map((acc: any, index: number) => ({
                   id: `accommodation-${index}`,
                   latitude: acc.latitude!,
@@ -1219,7 +1304,7 @@ const StepDetailScreen: React.FC = () => {
                 })),
               // Marqueurs pour les activités (icônes selon type)
               ...activities
-                .filter((act: any) => act.latitude && act.longitude)
+                .filter((act: any) => act.latitude && act.longitude && act.latitude !== 0 && act.longitude !== 0)
                 .map((act: any, index: number) => {
                   // Déterminer le type d'activité pour l'icône appropriée
                   let activityType = 'activity'; // par défaut
@@ -1281,8 +1366,8 @@ const StepDetailScreen: React.FC = () => {
             console.log('🗺️ StepDetailScreen - Markers pour carte:', {
               totalMarkers: markers.length,
               mainStep: 1,
-              accommodations: accommodations.filter((acc: any) => acc.latitude && acc.longitude).length,
-              activities: activities.filter((act: any) => act.latitude && act.longitude).length,
+              accommodations: accommodations.filter((acc: any) => acc.latitude && acc.longitude && acc.latitude !== 0 && acc.longitude !== 0).length,
+              activities: activities.filter((act: any) => act.latitude && act.longitude && act.latitude !== 0 && act.longitude !== 0).length,
               allMarkers: markers.map(m => ({ id: m.id, title: m.title, lat: m.latitude, lng: m.longitude }))
             });
 
