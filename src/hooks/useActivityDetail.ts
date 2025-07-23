@@ -1,7 +1,7 @@
 /**
  * Hook pour la récupération du détail d'une activité
  * Pattern offline-first conforme aux instructions Copilot
- * Architecture reprise de useAccommodationDetail.ts
+ * Reprise exacte de la mécanique useAccommodationDetail.ts
  */
 import { useState, useCallback, useEffect } from 'react';
 import { Q } from '@nozbe/watermelondb';
@@ -25,7 +25,7 @@ const isValidObjectId = (id: string): boolean => {
 /**
  * Hook principal pour les détails d'une activité
  */
-export const useActivityDetail_new = (stepId: string, activityId: string): UseActivityDetailResult => {
+export const useActivityDetail = (stepId: string, activityId: string): UseActivityDetailResult => {
   const [activity, setActivity] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
    */
   const refreshActivityDetail = useCallback(async (forceSync: boolean = false) => {
     if (loading) {
-      console.log('🚶 useActivityDetail_new - Chargement déjà en cours, ignoré');
+      console.log('🚶 useActivityDetail - Chargement déjà en cours, ignoré');
       return;
     }
 
@@ -43,7 +43,7 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
     setError(null);
 
     try {
-      console.log('🚶 useActivityDetail_new - Début refreshActivityDetail:', {
+      console.log('🚶 useActivityDetail - Début refreshActivityDetail:', {
         stepId,
         activityId,
         forceSync
@@ -58,7 +58,7 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
         throw new Error(`ID d'activité invalide: ${activityId}`);
       }
 
-      console.log('🚶 useActivityDetail_new - Chargement local:', {
+      console.log('🚶 useActivityDetail - Chargement local:', {
         stepId,
         activityId
       });
@@ -73,9 +73,9 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
       // Parser les activités depuis le JSON stocké
       let activities = [];
       try {
-        // CORRECTION FINALE: Utiliser activitiesJson (champ JSON) et non activities (relation)
-        const activitiesRaw = (step as any).activitiesJson;
-        console.log('🔍 useActivityDetail_new - Activités brutes:', {
+        // ✅ CORRECTION: Utiliser la même mécanique que useAccommodationDetail
+        const activitiesRaw = (step as any)._raw.activities;
+        console.log('🔍 useActivityDetail - Activités brutes:', {
           type: typeof activitiesRaw,
           value: activitiesRaw,
           isString: typeof activitiesRaw === 'string',
@@ -89,7 +89,7 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
           activities = activitiesRaw;
         }
         
-        console.log('🔍 useActivityDetail_new - Activités parsées:', {
+        console.log('🔍 useActivityDetail - Activités parsées:', {
           count: activities.length,
           activities: activities.map((act: any) => ({
             id: act._id,
@@ -98,13 +98,13 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
           }))
         });
       } catch (parseError) {
-        console.warn('⚠️ useActivityDetail_new - Erreur parsing activités:', parseError);
+        console.warn('⚠️ useActivityDetail - Erreur parsing activités:', parseError);
         activities = [];
       }
 
       // Trouver l'activité spécifique - CONVERSION STRING OBLIGATOIRE
       // Les ObjectIds MongoDB sont des objets, il faut les convertir en string pour comparaison
-      console.log('🔍 useActivityDetail_new - Recherche activité avec ID:', activityId);
+      console.log('🔍 useActivityDetail - Recherche activité avec ID:', activityId);
       
       if (activities.length === 0) {
         throw new Error(`Aucune activité trouvée dans le step: ${stepId}`);
@@ -112,7 +112,7 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
       
       const targetActivity = activities.find((act: any) => {
         const actId = act._id?.toString() || act._id;
-        console.log('🔍 useActivityDetail_new - Comparaison ID:', {
+        console.log('🔍 useActivityDetail - Comparaison ID:', {
           actId,
           activityId,
           match: actId === activityId,
@@ -123,22 +123,22 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
       });
 
       if (!targetActivity) {
-        console.error('❌ useActivityDetail_new - Activité non trouvée. IDs disponibles:', 
+        console.error('❌ useActivityDetail - Activité non trouvée. IDs disponibles:', 
           activities.map((act: any) => ({ id: act._id?.toString() || act._id, name: act.name })));
         throw new Error(`Activité non trouvée: ${activityId}`);
       }
 
-      console.log('✅ useActivityDetail_new - Activité trouvée:', {
+      console.log('✅ useActivityDetail - Activité trouvée:', {
         name: targetActivity.name,
         id: targetActivity._id
       });
 
       setActivity(targetActivity);
-      console.log('✅ useActivityDetail_new - Activité chargée depuis le cache local');
+      console.log('✅ useActivityDetail - Activité chargée depuis le cache local');
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
-      console.error('❌ useActivityDetail_new - Erreur:', errorMessage);
+      console.error('❌ useActivityDetail - Erreur:', errorMessage);
       setError(errorMessage);
       setActivity(null);
     } finally {
@@ -152,7 +152,7 @@ export const useActivityDetail_new = (stepId: string, activityId: string): UseAc
    */
   // useEffect(() => {
   //   if (stepId && activityId && !activity && !loading) {
-  //     console.log('🚶 useActivityDetail_new - Chargement initial automatique');
+  //     console.log('🚶 useActivityDetail - Chargement initial automatique');
   //     refreshActivityDetail();
   //   }
   // }, [stepId, activityId, activity, loading, refreshActivityDetail]);

@@ -9,7 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Contextes et navigation
-import { DatabaseProvider, AuthProvider, ThemeProvider, DataRefreshProvider } from './src/contexts';
+import { DatabaseProvider, AuthProvider, ThemeProvider, DataRefreshProvider, ToastProvider } from './src/contexts';
 import { AppNavigator } from './src/components/navigation/AppNavigator';
 
 // Configuration des warnings à ignorer (optionnel)
@@ -26,13 +26,15 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <DatabaseProvider>
-            <AuthProvider>
-              <DataRefreshProvider>
-                <AppNavigator />
-              </DataRefreshProvider>
-            </AuthProvider>
-          </DatabaseProvider>
+          <ToastProvider>
+            <DatabaseProvider>
+              <AuthProvider>
+                <DataRefreshProvider>
+                  <AppNavigator />
+                </DataRefreshProvider>
+              </AuthProvider>
+            </DatabaseProvider>
+          </ToastProvider>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

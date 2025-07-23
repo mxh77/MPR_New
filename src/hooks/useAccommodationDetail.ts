@@ -1,6 +1,7 @@
 /**
  * Hook pour la récupération du détail d'un accommodation
  * Pattern offline-first conforme aux instructions Copilot
+ * 
  */
 import { useState, useCallback, useEffect } from 'react';
 import { Q } from '@nozbe/watermelondb';

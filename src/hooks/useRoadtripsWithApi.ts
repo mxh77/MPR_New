@@ -57,29 +57,117 @@ export const useRoadtripsWithApi = () => {
   /**
    * Convertir un record WatermelonDB en RoadtripData
    */
-  const convertRecordToData = (record: Roadtrip): RoadtripData => ({
-    id: record.id,
-    title: record.title,
-    description: record.description,
-    startDate: new Date(record.startDate),
-    endDate: new Date(record.endDate),
-    startLocation: record.startLocation,
-    endLocation: record.endLocation,
-    currency: record.currency,
-    userId: record.userId,
-    isPublic: record.isPublic,
-    thumbnail: record.thumbnail,
-    totalSteps: record.totalSteps,
-    totalDistance: record.totalDistance,
-    estimatedDuration: record.estimatedDuration,
-    tags: record.tags,
-    photos: record.photos,
-    documents: record.documents,
-    syncStatus: record.customSyncStatus as 'pending' | 'synced' | 'error',
-    lastSyncAt: record.lastSyncAt ? new Date(record.lastSyncAt) : undefined,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-  });
+  const convertRecordToData = (record: Roadtrip): RoadtripData => {
+    // Extraction sécurisée du thumbnail pour gérer les formats anciens
+    let thumbnailUrl: string | undefined;
+    
+    if (record.thumbnail) {
+      // Si c'est déjà une string URL, l'utiliser directement
+      if (typeof record.thumbnail === 'string') {
+        // Vérifier si c'est un JSON sérialisé (cas des anciennes données)
+        if (record.thumbnail.startsWith('{') || record.thumbnail.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(record.thumbnail);
+            thumbnailUrl = extractThumbnailUrl(parsed);
+          } catch (e) {
+            console.warn('❌ Erreur parsing thumbnail JSON:', e);
+            thumbnailUrl = record.thumbnail;
+          }
+        } else {
+          thumbnailUrl = record.thumbnail;
+        }
+      } else {
+        // Si c'est un objet (ne devrait pas arriver mais par sécurité)
+        thumbnailUrl = extractThumbnailUrl(record.thumbnail);
+      }
+    }
+
+    return {
+      id: record.id,
+      title: record.title,
+      description: record.description,
+      startDate: new Date(record.startDate),
+      endDate: new Date(record.endDate),
+      startLocation: record.startLocation,
+      endLocation: record.endLocation,
+      currency: record.currency,
+      userId: record.userId,
+      isPublic: record.isPublic,
+      thumbnail: thumbnailUrl,
+      totalSteps: record.totalSteps,
+      totalDistance: record.totalDistance,
+      estimatedDuration: record.estimatedDuration,
+      tags: record.tags,
+      photos: record.photos,
+      documents: record.documents,
+      syncStatus: record.customSyncStatus as 'pending' | 'synced' | 'error',
+      lastSyncAt: record.lastSyncAt ? new Date(record.lastSyncAt) : undefined,
+      createdAt: new Date(record.createdAt),
+      updatedAt: new Date(record.updatedAt),
+    };
+  };
+
+  /**
+   * Migration pour corriger les thumbnails corrompus en base
+   * Convertit les objets JSON en URLs string
+   */
+  const migrateThumbnailsData = useCallback(async () => {
+    if (!isReady || !database || !user) return;
+
+    try {
+      console.log('🔧 Migration des thumbnails corrompus...');
+      
+      const roadtripsCollection = database.get<Roadtrip>('roadtrips');
+      const allRoadtrips = await roadtripsCollection
+        .query(Q.where('user_id', user._id))
+        .fetch();
+
+      let migratedCount = 0;
+
+      await database.write(async () => {
+        for (const roadtrip of allRoadtrips) {
+          if (roadtrip.thumbnail) {
+            let needsUpdate = false;
+            let cleanThumbnail = '';
+
+            // Vérifier si c'est un JSON sérialisé
+            if (typeof roadtrip.thumbnail === 'string' && 
+                (roadtrip.thumbnail.startsWith('{') || roadtrip.thumbnail.startsWith('['))) {
+              try {
+                const parsed = JSON.parse(roadtrip.thumbnail);
+                const extractedUrl = extractThumbnailUrl(parsed);
+                if (extractedUrl) {
+                  cleanThumbnail = extractedUrl;
+                  needsUpdate = true;
+                }
+              } catch (e) {
+                console.warn('❌ Erreur parsing thumbnail pour roadtrip:', roadtrip.id);
+              }
+            }
+
+            // Mettre à jour si nécessaire
+            if (needsUpdate) {
+              await roadtrip.update(r => {
+                r._setRaw('thumbnail', cleanThumbnail);
+              });
+              migratedCount++;
+              console.log(`✅ Thumbnail migré pour roadtrip: ${roadtrip.title}`);
+            }
+          }
+        }
+      });
+
+      if (migratedCount > 0) {
+        console.log(`🎯 Migration terminée: ${migratedCount} thumbnails corrigés`);
+        // Recharger les données après migration
+        await fetchLocalRoadtrips();
+      } else {
+        console.log('✅ Aucune migration nécessaire');
+      }
+    } catch (err) {
+      console.error('❌ Erreur migration thumbnails:', err);
+    }
+  }, [isReady, database, user]); // Retirer fetchLocalRoadtrips pour éviter la dépendance circulaire
 
   /**
    * Charger les roadtrips depuis WatermelonDB (toujours en premier)
@@ -215,7 +303,27 @@ export const useRoadtripsWithApi = () => {
 
           if (existingRecord) {
             console.log(`📋 Roadtrip ${apiRoadtrip.name} existe déjà (ID: ${existingRecord.id})`);
-            // Pas de mise à jour pour l'instant - éviter les boucles
+            
+            // ✅ CORRECTION: Mettre à jour le thumbnail si différent
+            const currentThumbnail = existingRecord.thumbnail || '';
+            if (thumbnailUrl && thumbnailUrl !== currentThumbnail) {
+              console.log(`🖼️ Mise à jour thumbnail pour ${apiRoadtrip.name}`);
+              console.log(`   - Ancien: ${currentThumbnail}`);
+              console.log(`   - Nouveau: ${thumbnailUrl}`);
+              
+              await database.write(async () => {
+                await existingRecord.update(roadtrip => {
+                  roadtrip._setRaw('thumbnail', thumbnailUrl);
+                  roadtrip._setRaw('sync_status', 'synced');
+                  roadtrip._setRaw('last_sync_at', Date.now());
+                  roadtrip._setRaw('updated_at', Date.now());
+                });
+              });
+              hasChanges = true;
+              console.log(`✅ Thumbnail mis à jour pour ${apiRoadtrip.name}`);
+            } else {
+              console.log(`✅ Thumbnail inchangé pour ${apiRoadtrip.name}`);
+            }
           } else {
             // Créer nouveau roadtrip local
             console.log(`➕ Création nouveau roadtrip: ${apiRoadtrip.name}`);
@@ -352,7 +460,30 @@ export const useRoadtripsWithApi = () => {
               const mongoIdString = String(apiRoadtrip._id);
               const existingRecord = await roadtripsCollection.find(mongoIdString).catch(() => null);
 
-              if (!existingRecord) {
+              if (existingRecord) {
+                // ✅ CORRECTION: Mettre à jour le thumbnail si différent
+                const thumbnailUrl = extractThumbnailUrl(apiRoadtrip.thumbnail);
+                const currentThumbnail = existingRecord.thumbnail || '';
+                
+                if (thumbnailUrl && thumbnailUrl !== currentThumbnail) {
+                  console.log(`🖼️ Mise à jour thumbnail pour ${apiRoadtrip.name}`);
+                  console.log(`   - Ancien: ${currentThumbnail}`);
+                  console.log(`   - Nouveau: ${thumbnailUrl}`);
+                  
+                  await database.write(async () => {
+                    await existingRecord.update(roadtrip => {
+                      roadtrip._setRaw('thumbnail', thumbnailUrl);
+                      roadtrip._setRaw('sync_status', 'synced');
+                      roadtrip._setRaw('last_sync_at', Date.now());
+                      roadtrip._setRaw('updated_at', Date.now());
+                    });
+                  });
+                  hasChanges = true;
+                  console.log(`✅ Thumbnail mis à jour pour ${apiRoadtrip.name}`);
+                } else {
+                  console.log(`✅ Thumbnail inchangé pour ${apiRoadtrip.name}`);
+                }
+              } else if (!existingRecord) {
                 console.log(`➕ Création nouveau roadtrip: ${apiRoadtrip.name}`);
                 await database.write(async () => {
                   await roadtripsCollection.create(roadtrip => {
@@ -487,7 +618,7 @@ export const useRoadtripsWithApi = () => {
           await database.write(async () => {
             await newRoadtrip.update(roadtrip => {
               roadtrip.customSyncStatus = 'synced';
-              roadtrip.lastSyncAt = new Date();
+              roadtrip.lastSyncAt = Date.now();
             });
           });
 
@@ -581,6 +712,7 @@ export const useRoadtripsWithApi = () => {
     // Actions spécifiques
     refreshRoadtrips: () => fetchRoadtrips(true), // Force la synchronisation
     resolveIdConflicts, // ✅ NOUVEAU: Résoudre les conflits d'IDs
+    migrateThumbnailsData, // ✅ NOUVEAU: Migration des thumbnails corrompus
 
     // Stats
     totalRoadtrips: roadtrips.length,

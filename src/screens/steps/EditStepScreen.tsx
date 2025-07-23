@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { useTheme, useDataRefresh } from '../../contexts';
+import { useTheme, useDataRefresh, useToast } from '../../contexts';
 import { useStepDetail } from '../../hooks/useStepDetail';
 import { useStepUpdate } from '../../hooks/useStepUpdate';
 import type { Step } from '../../types';
@@ -249,6 +249,7 @@ interface RouteParams {
 const EditStepScreen: React.FC = () => {
   const { theme } = useTheme();
   const { notifyStepUpdate } = useDataRefresh();
+  const { showSuccess } = useToast();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<EditStepScreenNavigationProp>();
   const route = useRoute();
@@ -460,31 +461,23 @@ const EditStepScreen: React.FC = () => {
         // Succès immédiat après sauvegarde locale
         console.log('✅ EditStepScreen - Sauvegarde locale réussie, affichage succès immédiat');
         
-        Alert.alert(
-          'Succès',
-          'Les modifications ont été sauvegardées',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                console.log('🔄 EditStepScreen - Notification et retour immédiat');
-                
-                // Notifier le système qu'un step a été mis à jour
-                notifyStepUpdate(stepId);
-                
-                // Rafraîchir les données locales et retourner immédiatement
-                refreshStepDetail(false).then(() => {
-                  console.log('✅ EditStepScreen - Rafraîchissement local terminé');
-                }).catch(err => {
-                  console.warn('⚠️ EditStepScreen - Erreur rafraîchissement mineur:', err);
-                });
-                
-                // Retourner immédiatement sans attendre la sync
-                navigation.goBack();
-              }
-            }
-          ]
-        );
+        // Toast succès discret
+        showSuccess('Modifications sauvegardées');
+        
+        console.log('🔄 EditStepScreen - Notification et retour immédiat');
+        
+        // Notifier le système qu'un step a été mis à jour
+        notifyStepUpdate(stepId);
+        
+        // Rafraîchir les données locales et retourner immédiatement
+        refreshStepDetail(false).then(() => {
+          console.log('✅ EditStepScreen - Rafraîchissement local terminé');
+        }).catch(err => {
+          console.warn('⚠️ EditStepScreen - Erreur rafraîchissement mineur:', err);
+        });
+        
+        // Retourner immédiatement sans attendre la sync
+        navigation.goBack();
       } else {
         throw new Error('Erreur lors de la sauvegarde locale');
       }

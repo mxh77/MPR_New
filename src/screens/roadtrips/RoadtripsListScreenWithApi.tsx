@@ -23,6 +23,7 @@ import { RoadtripMenu } from '../../components/common/RoadtripMenu';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
+import { getImageUri, debugThumbnail } from '../../utils/thumbnailUtils';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 60) / 2; // 2 colonnes avec marges
@@ -163,13 +164,36 @@ const RoadtripCard: React.FC<RoadtripCardProps> = ({ item, onPress, onMenuPress,
     >
       {/* Image/Thumbnail */}
       <View style={[cardStyles.cardImage, { backgroundColor: theme.colors.background }]}>
-        {item.thumbnail ? (
-          <Image source={{ uri: item.thumbnail }} style={cardStyles.thumbnailImage} />
-        ) : (
-          <View style={cardStyles.placeholderImage}>
-            <Ionicons name="map" size={32} color={theme.colors.textSecondary} />
-          </View>
-        )}
+        {(() => {
+          // Debug du thumbnail reçu
+          if (__DEV__) {
+            debugThumbnail(item.thumbnail, `RoadtripCard-${item.title}`);
+          }
+          
+          // Extraction sécurisée de l'URL
+          const thumbnailUri = getImageUri(item.thumbnail);
+          
+          if (thumbnailUri) {
+            return (
+              <Image 
+                source={{ uri: thumbnailUri }} 
+                style={cardStyles.thumbnailImage}
+                onError={(error) => {
+                  console.error('❌ Erreur chargement thumbnail roadtrip:', error);
+                  if (__DEV__) {
+                    debugThumbnail(item.thumbnail, `RoadtripCard-ERROR-${item.title}`);
+                  }
+                }}
+              />
+            );
+          } else {
+            return (
+              <View style={cardStyles.placeholderImage}>
+                <Ionicons name="map" size={32} color={theme.colors.textSecondary} />
+              </View>
+            );
+          }
+        })()}
         
         {/* Sync Status Badge */}
         <View style={[cardStyles.syncBadge, { backgroundColor: theme.colors.background + 'CC' }]}>

@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useTheme, useDataRefresh } from '../../contexts';
+import { useTheme, useDataRefresh, useToast } from '../../contexts';
 import { useAccommodationDetail } from '../../hooks/useAccommodationDetail';
 import { useAccommodationUpdate } from '../../hooks/useAccommodationUpdate';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
@@ -100,6 +100,7 @@ export const EditAccommodationScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { notifyStepUpdate } = useDataRefresh();
+  const { showSuccess } = useToast();
 
   // Hooks métier
   const { accommodation, loading, error: loadError, refreshAccommodationDetail } = useAccommodationDetail(stepId, accommodationId);
@@ -276,17 +277,14 @@ export const EditAccommodationScreen: React.FC = () => {
     const result = await updateAccommodationData(stepId, accommodationId, accommodationData);
 
     if (result) {
-      // Sauvegarde locale réussie - Alert succès IMMÉDIAT
-      Alert.alert('Succès', 'Les modifications ont été sauvegardées', [{
-        text: 'OK',
-        onPress: () => {
-          // Notifier le système de rafraîchissement
-          notifyStepUpdate(stepId);
+      // Sauvegarde locale réussie - Toast succès discret
+      showSuccess('Modifications sauvegardées');
+      
+      // Notifier le système de rafraîchissement
+      notifyStepUpdate(stepId);
 
-          // Retourner à l'écran précédent
-          navigation.goBack();
-        }
-      }]);
+      // Retourner à l'écran précédent
+      navigation.goBack();
     } else {
       Alert.alert('Erreur', updateError || 'Erreur lors de la sauvegarde');
     }

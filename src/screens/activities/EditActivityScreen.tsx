@@ -21,8 +21,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useTheme, useDataRefresh } from '../../contexts';
-import { useActivityDetail_new } from '../../hooks/useActivityDetail';
+import { useTheme, useDataRefresh, useToast } from '../../contexts';
+import { useActivityDetail } from '../../hooks/useActivityDetail';
 import { useActivityUpdate_new } from '../../hooks/useActivityUpdate';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { parseISODate } from '../../utils';
@@ -160,9 +160,10 @@ export const EditActivityScreen_new: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const { notifyStepUpdate } = useDataRefresh();
+  const { showSuccess } = useToast();
 
   // Hooks métier
-  const { activity, loading, error: loadError, refreshActivityDetail } = useActivityDetail_new(stepId, activityId);
+  const { activity, loading, error: loadError, refreshActivityDetail } = useActivityDetail(stepId, activityId);
   const { updating, error: updateError, updateActivityData } = useActivityUpdate_new();
 
   // État du formulaire - Basé sur le modèle backend Activity
@@ -348,17 +349,17 @@ export const EditActivityScreen_new: React.FC = () => {
     const result = await updateActivityData(stepId, activityId, activityData);
 
     if (result) {
-      // Sauvegarde locale réussie - Alert succès IMMÉDIAT
-      Alert.alert('Succès', 'Les modifications ont été sauvegardées', [{
-        text: 'OK',
-        onPress: () => {
-          // Notifier le système de rafraîchissement
-          notifyStepUpdate(stepId);
+      // Sauvegarde locale réussie - Toast succès discret
+      showSuccess('Modifications sauvegardées');
+      
+      // Rafraîchir les données locales pour mettre à jour l'affichage (notamment thumbnail)
+      await refreshActivityDetail(true);
+      
+      // Notifier le système de rafraîchissement
+      notifyStepUpdate(stepId);
 
-          // Retourner à l'écran précédent
-          navigation.goBack();
-        }
-      }]);
+      // Retourner à l'écran précédent
+      navigation.goBack();
     } else {
       Alert.alert('Erreur', updateError || 'Erreur lors de la sauvegarde');
     }
@@ -367,7 +368,7 @@ export const EditActivityScreen_new: React.FC = () => {
     startDate, startTime, endDate, endTime,
     phone, notes, thumbnail,
     stepId, activityId, updateActivityData, updateError,
-    notifyStepUpdate, navigation, buildDateTime,
+    notifyStepUpdate, navigation, buildDateTime, refreshActivityDetail, showSuccess,
     // Champs MongoDB complets spécifiques aux activités
     email, website, reservationNumber, price, currency, duration, typeDuration,
     trailDistance, trailElevation, trailType

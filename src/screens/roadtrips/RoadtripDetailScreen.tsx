@@ -21,6 +21,7 @@ import { useRoadtripDetail } from '../../hooks';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
+import { getImageUri, debugThumbnail } from '../../utils/thumbnailUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -313,13 +314,36 @@ export const RoadtripDetailScreen: React.FC<RoadtripDetailScreenProps> = () => {
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Hero Section */}
           <View style={styles.heroSection}>
-            {roadtrip.thumbnail ? (
-              <Image source={{ uri: roadtrip.thumbnail }} style={styles.heroImage} />
-            ) : (
-              <View style={styles.heroPlaceholder}>
-                <Ionicons name="image-outline" size={64} color={theme.colors.textSecondary} />
-              </View>
-            )}
+            {(() => {
+              // Debug du thumbnail reçu
+              if (__DEV__) {
+                debugThumbnail(roadtrip.thumbnail, `RoadtripDetail-${roadtrip.title}`);
+              }
+              
+              // Extraction sécurisée de l'URL
+              const thumbnailUri = getImageUri(roadtrip.thumbnail);
+              
+              if (thumbnailUri) {
+                return (
+                  <Image 
+                    source={{ uri: thumbnailUri }} 
+                    style={styles.heroImage}
+                    onError={(error) => {
+                      console.error('❌ Erreur chargement thumbnail roadtrip detail:', error);
+                      if (__DEV__) {
+                        debugThumbnail(roadtrip.thumbnail, `RoadtripDetail-ERROR-${roadtrip.title}`);
+                      }
+                    }}
+                  />
+                );
+              } else {
+                return (
+                  <View style={styles.heroPlaceholder}>
+                    <Ionicons name="image-outline" size={64} color={theme.colors.textSecondary} />
+                  </View>
+                );
+              }
+            })()}
             
             <View style={styles.heroOverlay}>
               <Text style={styles.heroTitle}>{roadtrip.title}</Text>

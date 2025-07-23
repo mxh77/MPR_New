@@ -25,6 +25,7 @@ import { useSteps } from '../../hooks/useSteps';
 import type { Step, StepType } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { formatDateWithoutTimezone } from '../../utils';
+import { BadgeContainer } from '../../components/common';
 
 const { width } = Dimensions.get('window');
 
@@ -563,44 +564,65 @@ const StepsListScreen: React.FC = () => {
 
         {/* Contenu principal avec fond blanc */}
         <View style={{ padding: 16, backgroundColor: '#ffffff' }}>
-          {/* Image de l'étape */}
+          {/* Image de l'étape avec badges */}
           {(() => {
             const imageUri = getImageUri(item.thumbnail);
+            const stepWithData = item as any; // Cast pour accéder aux données supplémentaires
+            const activityCount = Array.isArray(stepWithData.activities) ? stepWithData.activities.length : 0;
+            const accommodationCount = Array.isArray(stepWithData.accommodations) ? stepWithData.accommodations.length : 0;
+            const hasAddress = Boolean(item.location?.address?.trim());
+            
             // console.log('🖼️ renderStepItem - URI calculée pour', item.title, ':', imageUri);
             // console.log('🖼️ renderStepItem - URI calculée pour', item.title);
             
             // Vérification de sécurité supplémentaire pour s'assurer que l'URI est bien une chaîne
             if (imageUri && typeof imageUri === 'string' && imageUri.length > 0) {
               return (
-                <Image
-                  source={{ uri: imageUri }}
-                  style={{ 
-                    height: 120, 
-                    borderRadius: 8, 
-                    marginBottom: 12,
-                    backgroundColor: '#F5F5F5' 
-                  }}
-                  resizeMode="cover"
-                  onLoad={() => console.log('🖼️ Image chargée avec succès:')}
-                  onError={(error) => {
-                    console.warn('🖼️ Erreur de chargement d\'image:', error.nativeEvent.error, 'pour URI:', imageUri);
-                  }}
-                />
+                <View style={{ position: 'relative' }}>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={{ 
+                      height: 120, 
+                      borderRadius: 8, 
+                      marginBottom: 12,
+                      backgroundColor: '#F5F5F5' 
+                    }}
+                    resizeMode="cover"
+                    onLoad={() => console.log('🖼️ Image chargée avec succès:')}
+                    onError={(error) => {
+                      console.warn('🖼️ Erreur de chargement d\'image:', error.nativeEvent.error, 'pour URI:', imageUri);
+                    }}
+                  />
+                  <BadgeContainer
+                    accommodationCount={accommodationCount}
+                    activityCount={activityCount}
+                    hasAddress={hasAddress}
+                    position="top-right"
+                  />
+                </View>
               );
             } else {
               return (
-                <View style={{ 
-                  height: 120, 
-                  backgroundColor: '#F5F5F5', 
-                  borderRadius: 8, 
-                  justifyContent: 'center', 
-                  alignItems: 'center', 
-                  marginBottom: 12 
-                }}>
-                  <Ionicons name="image-outline" size={32} color={theme.colors.textSecondary} />
-                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 8 }}>
-                    Pas d'image
-                  </Text>
+                <View style={{ position: 'relative' }}>
+                  <View style={{ 
+                    height: 120, 
+                    backgroundColor: '#F5F5F5', 
+                    borderRadius: 8, 
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    marginBottom: 12 
+                  }}>
+                    <Ionicons name="image-outline" size={32} color={theme.colors.textSecondary} />
+                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 8 }}>
+                      Pas d'image
+                    </Text>
+                  </View>
+                  <BadgeContainer
+                    accommodationCount={accommodationCount}
+                    activityCount={activityCount}
+                    hasAddress={hasAddress}
+                    position="top-right"
+                  />
                 </View>
               );
             }

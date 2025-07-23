@@ -6,6 +6,7 @@ import { useState, useCallback } from 'react';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../services/database';
 import { updateActivity } from '../services/api/activities';
+import { useDataRefresh } from '../contexts';
 import StepModel from '../services/database/models/Step';
 
 interface UseActivityUpdateResult {
@@ -50,8 +51,8 @@ const updateActivityInLocal = async (stepId: string, activityId: string, activit
             console.log('🔍 useActivityUpdate_new - Contenu complet du step:', {
                 stepId: existingStep.id,
                 stepName: (existingStep as any).name,
-                activitiesJson: (existingStep as any).activitiesJson,
-                activitiesJsonType: typeof (existingStep as any).activitiesJson,
+                activitiesJson: (existingStep as any)._raw.activities,
+                activitiesJsonType: typeof (existingStep as any)._raw.activities,
                 activitiesRelation: (existingStep as any).activities,
                 activitiesRelationType: typeof (existingStep as any).activities,
                 allFields: Object.keys(existingStep._raw || {}).filter(key =>
@@ -60,8 +61,8 @@ const updateActivityInLocal = async (stepId: string, activityId: string, activit
             });      // Récupérer les activités actuelles
             let activities = [];
             try {
-                // CORRECTION FINALE: Utiliser activitiesJson (champ JSON) et non activities (relation)
-                const activitiesRaw = (existingStep as any).activitiesJson;
+                // ✅ CORRECTION: Utiliser la même méthode que useActivityDetail
+                const activitiesRaw = (existingStep as any)._raw.activities;
                 console.log('🔍 useActivityUpdate_new - Activités brutes:', {
                     type: typeof activitiesRaw,
                     isString: typeof activitiesRaw === 'string',
@@ -191,7 +192,7 @@ const updateActivityInLocal = async (stepId: string, activityId: string, activit
 /**
  * Synchronise l'activité spécifique avec l'API
  */
-const syncActivityWithAPI = async (activityId: string, activityData: any): Promise<void> => {
+const syncActivityWithAPI = async (activityId: string, activityData: any, stepId: string): Promise<void> => {
     try {
         console.log('🔄 useActivityUpdate_new - Début sync API pour activité:', activityId);
 
@@ -230,32 +231,118 @@ const syncActivityWithAPI = async (activityId: string, activityData: any): Promi
         const updatedActivity = await updateActivity(activityId, updateData);
 
         if (updatedActivity) {
-            // Mettre à jour le statut de sync en local pour le step
-            const stepsCollection = database.get<StepModel>('steps');
-            const steps = await stepsCollection.query().fetch();
+            console.log('✅ useActivityUpdate_new - Réponse API activité reçue:', {
+                activityId: updatedActivity._id,
+                name: updatedActivity.name,
+                hasThumbnail: !!updatedActivity.thumbnail,
+                thumbnailUrl: updatedActivity.thumbnail?.url
+            });
 
-            // Trouver le step qui contient cette activité
-            for (const step of steps) {
-                const activitiesRaw = (step as any).activitiesJson;
-                if (activitiesRaw) {
-                    try {
-                        const activities = JSON.parse(activitiesRaw);
-                        const hasActivity = activities.some((act: any) =>
-                            (act._id?.toString() || act._id) === activityId
+            // ✅ IMPORTANT: Mettre à jour les données locales avec la réponse API
+            const stepsCollection = database.get<StepModel>('steps');
+            
+            // ✅ CORRECTION: Utiliser le stepId fourni pour cibler directement le step
+            const step = await stepsCollection.find(stepId);
+            const activitiesRaw = (step as any)._raw.activities;
+            
+            if (activitiesRaw) {
+                try {
+                    const activities = JSON.parse(activitiesRaw);
+                    const activityIndex = activities.findIndex((act: any) =>
+                        (act._id?.toString() || act._id) === activityId
+                    );
+
+                    if (activityIndex !== -1) {
+                        // ✅ LOGIC INTELLIGENTE: Préserver les données locales récentes
+                        const localActivity = activities[activityIndex];
+                        
+                        console.log('🔄 useActivityUpdate_new - DEBUG données avant merge:', {
+                            activityId,
+                            localActivity: {
+                                thumbnail: localActivity.thumbnail,
+                                updatedAt: localActivity.updatedAt,
+                                name: localActivity.name
+                            },
+                            apiActivity: {
+                                thumbnail: updatedActivity.thumbnail,
+                                updatedAt: updatedActivity.updatedAt,
+                                name: updatedActivity.name
+                            }
+                        });
+                        
+                        const localUpdatedAt = new Date(localActivity.updatedAt || 0);
+                        const apiUpdatedAt = new Date(updatedActivity.updatedAt || 0);
+                        
+                        console.log('🔄 useActivityUpdate_new - Comparaison timestamps:', {
+                            activityId,
+                            localTimestamp: localUpdatedAt.toISOString(),
+                            apiTimestamp: apiUpdatedAt.toISOString(),
+                            localIsNewer: localUpdatedAt > apiUpdatedAt,
+                            localThumbnail: localActivity.thumbnail,
+                            apiThumbnail: updatedActivity.thumbnail
+                        });
+
+                        // ✅ NOUVELLE LOGIQUE: Si thumbnail local existe et est récent, le préserver
+                        let finalThumbnail = null;
+                        let shouldUpdate = false;
+                        
+                        // Vérifier si thumbnail local est un fichier (commence par "file://")
+                        const hasLocalFileThumbnail = localActivity.thumbnail && 
+                            typeof localActivity.thumbnail === 'string' && 
+                            localActivity.thumbnail.startsWith('file://');
+                            
+                        // Vérifier si thumbnail API est un ID MongoDB ou objet
+                        const hasApiThumbnail = updatedActivity.thumbnail && (
+                            typeof updatedActivity.thumbnail === 'string' || 
+                            typeof updatedActivity.thumbnail === 'object'
                         );
 
-                        if (hasActivity) {
+                        if (hasLocalFileThumbnail) {
+                            console.log('🔄 useActivityUpdate_new - Thumbnail local fichier détecté, UTILISER LE THUMBNAIL API');
+                            // Si local a un fichier, l'API a traité l'upload → utiliser le résultat API
+                            finalThumbnail = updatedActivity.thumbnail;
+                            shouldUpdate = true;
+                        } else if (hasApiThumbnail) {
+                            console.log('🔄 useActivityUpdate_new - Utilisation thumbnail API uniquement');
+                            finalThumbnail = updatedActivity.thumbnail;
+                            shouldUpdate = true;
+                        } else {
+                            console.log('🔄 useActivityUpdate_new - Préservation thumbnail local');
+                            finalThumbnail = localActivity.thumbnail;
+                            shouldUpdate = true;
+                        }
+
+                        if (shouldUpdate) {
+                            // Merger intelligemment les données
+                            const mergedActivity = {
+                                ...localActivity, // Base locale
+                                ...updatedActivity, // Données API
+                                _id: activityId, // Préserver l'ID MongoDB
+                                thumbnail: finalThumbnail, // Thumbnail calculé intelligemment
+                                updatedAt: new Date().toISOString() // Nouveau timestamp
+                            };
+                            
+                            activities[activityIndex] = mergedActivity;
+
+                            console.log('🔄 useActivityUpdate_new - Activité mergée intelligemment:', {
+                                activityId,
+                                finalThumbnail: mergedActivity.thumbnail,
+                                finalTimestamp: mergedActivity.updatedAt
+                            });
+
                             await database.write(async () => {
                                 await step.update((s: StepModel) => {
+                                    s._setRaw('activities', JSON.stringify(activities));
                                     s._setRaw('sync_status', 'synced');
                                     s._setRaw('last_sync_at', Date.now());
                                 });
                             });
-                            break;
+                        } else {
+                            console.log('🔄 useActivityUpdate_new - Pas de mise à jour nécessaire');
                         }
-                    } catch (parseError) {
-                        console.warn('⚠️ Erreur parsing activités pour step:', step.id);
                     }
+                } catch (parseError) {
+                    console.warn('⚠️ Erreur parsing activités pour merge API:', parseError);
                 }
             }
 
@@ -271,7 +358,8 @@ const syncActivityWithAPI = async (activityId: string, activityData: any): Promi
             const steps = await stepsCollection.query().fetch();
 
             for (const step of steps) {
-                const activitiesRaw = (step as any).activitiesJson;
+                // ✅ CORRECTION: Utiliser _raw.activities comme partout ailleurs
+                const activitiesRaw = (step as any)._raw.activities;
                 if (activitiesRaw) {
                     try {
                         const activities = JSON.parse(activitiesRaw);
@@ -308,6 +396,7 @@ const syncActivityWithAPI = async (activityId: string, activityData: any): Promi
 export const useActivityUpdate_new = (): UseActivityUpdateResult => {
     const [updating, setUpdating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { notifyStepUpdate } = useDataRefresh();
 
     /**
      * Fonction principale de mise à jour - OFFLINE-FIRST
@@ -354,10 +443,14 @@ export const useActivityUpdate_new = (): UseActivityUpdateResult => {
 
             console.log('✅ PHASE 1 terminée - Activité sauvegardée localement');
 
+            // ✅ NOTIFICATION: Informer le système qu'un step a été mis à jour
+            console.log('🔔 useActivityUpdate_new - Notification de mise à jour step:', stepId);
+            notifyStepUpdate(stepId);
+
             // PHASE 2: Synchronisation API en arrière-plan (non-bloquante)
             console.log('🔄 PHASE 2: Sync API en arrière-plan');
             Promise.resolve().then(async () => {
-                await syncActivityWithAPI(activityId, data);
+                await syncActivityWithAPI(activityId, data, stepId);
             });
 
             // Retour immédiat après sauvegarde locale
@@ -372,7 +465,7 @@ export const useActivityUpdate_new = (): UseActivityUpdateResult => {
         } finally {
             setUpdating(false);
         }
-    }, [updating]);
+    }, [updating, notifyStepUpdate]);
 
     return {
         updating,
