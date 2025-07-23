@@ -26,6 +26,7 @@ import type { Step, StepType } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { formatDateWithoutTimezone } from '../../utils';
 import { BadgeContainer } from '../../components/common';
+import { openInterStepRoute } from '../../utils/interStepNavigation';
 
 const { width } = Dimensions.get('window');
 
@@ -383,6 +384,16 @@ const StepsListScreen: React.FC = () => {
     return null;
   };
 
+  // Gestionnaire de clic sur les informations de transport inter-étapes
+  const handleTransportInfoPress = async (currentStep: Step, nextStep: Step) => {
+    console.log('🛣️ Clic sur info transport:', {
+      from: currentStep.title,
+      to: nextStep.title
+    });
+    
+    await openInterStepRoute(currentStep, nextStep);
+  };
+
   const renderTransportInfo = (currentStep: Step, nextStep?: Step) => {
     // Debug pour comprendre pourquoi les infos transport manquent entre les étapes
     // console.log('🚛 renderTransportInfo - Étape actuelle:', {
@@ -454,7 +465,11 @@ const StepsListScreen: React.FC = () => {
     
     return (
       <View style={styles.transportContainer}>
-        <View style={[styles.transportCard, { backgroundColor }]}>
+        <TouchableOpacity 
+          style={[styles.transportCard, { backgroundColor }]}
+          onPress={() => nextStep && handleTransportInfoPress(currentStep, nextStep)}
+          activeOpacity={0.7}
+        >
           <View style={{
             width: 32,
             height: 32,
@@ -487,9 +502,9 @@ const StepsListScreen: React.FC = () => {
             justifyContent: 'center',
             alignItems: 'center',
           }}>
-            <Ionicons name="arrow-down" size={12} color="#666666" />
+            <Ionicons name="navigate" size={12} color="#666666" />
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
