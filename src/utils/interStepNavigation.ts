@@ -2,7 +2,7 @@
  * Utilitaires pour la navigation inter-étapes - VERSION CORRIGÉE
  * Calcul des points de départ/arrivée et ouverture dans Google Maps
  */
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import type { Step } from '../types';
 
 interface LocationPoint {
@@ -262,8 +262,8 @@ export const openGoogleMapsRoute = async (
     const dirflg = dirflgMap[travelMode];
     const avoid = avoidOptions.map(option => avoidMap[option]).join('');
     
-    // URL pour l'app Google Maps (iOS/Android) avec API v1
-    let mapsAppUrl = `https://www.google.com/maps/dir/?api=1&origin=${fromCoords}&destination=${toCoords}&travelmode=${travelMode}`;
+    // URL pour l'app Google Maps (iOS/Android) avec API v1 et navigation
+    let mapsAppUrl = `https://www.google.com/maps/dir/?api=1&origin=${fromCoords}&destination=${toCoords}&travelmode=${travelMode}&dir_action=navigate`;
     if (avoidOptions.length > 0) {
       mapsAppUrl += `&avoid=${avoidOptions.join('|')}`;
     }
@@ -274,21 +274,110 @@ export const openGoogleMapsRoute = async (
       webUrl += `&avoid=${avoid}`;
     }
 
+    // URL spécifique pour forcer l'ouverture dans Google Maps app avec navigation et origine
+    const googleMapsAppUrl = `comgooglemaps://?saddr=${fromCoords}&daddr=${toCoords}&directionsmode=driving&nav=1&start=true`;
+    
+    // URL Android native pour démarrage direct de navigation (Intent-based)
+    // Cette méthode démarre directement la navigation mais sans point de départ spécifique
+    const androidNavigationUrl = `google.navigation:q=${toCoords}&mode=d`;
+    
+    // URL Android alternative avec syntaxe complète
+    const androidNavigationFullUrl = `intent://navigation?q=${toCoords}&mode=d#Intent;scheme=google.navigation;package=com.google.android.apps.maps;end`;
+    
+    // URL iOS alternative pour Apple Maps navigation
+    const iosNavigationUrl = `http://maps.apple.com/?saddr=${fromCoords}&daddr=${toCoords}&dirflg=d`;
+
     console.log('🗺️ Ouverture Google Maps route:', {
       from: `${fromPoint.name} (${fromCoords})`,
       to: `${toPoint.name} (${toCoords})`,
-      url: mapsAppUrl
+      platform: Platform.OS,
+      standardUrl: mapsAppUrl,
+      appUrl: googleMapsAppUrl,
+      androidNavUrl: androidNavigationUrl,
+      androidNavFullUrl: androidNavigationFullUrl,
+      iosNavUrl: iosNavigationUrl
     });
 
-    // Essayer d'ouvrir dans l'app Google Maps
-    const canOpenMaps = await Linking.canOpenURL(mapsAppUrl);
+    // Essayer d'ouvrir dans l'app Google Maps avec différentes méthodes selon la plateforme
     
-    if (canOpenMaps) {
-      await Linking.openURL(mapsAppUrl);
-    } else {
-      // Fallback vers le navigateur web
-      await Linking.openURL(webUrl);
+    // ANDROID: Essayer d'abord l'intent natif pour navigation directe
+    if (Platform.OS === 'android') {
+      // Méthode Android 1: Navigation directe vers destination (Démarrer immédiat)
+      try {
+        const canOpenAndroidNav = await Linking.canOpenURL(androidNavigationUrl);
+        console.log('🤖 Test Android navigation intent (destination seule):', { canOpen: canOpenAndroidNav, url: androidNavigationUrl });
+        
+        if (canOpenAndroidNav) {
+          console.log('✅ Ouverture via Android navigation intent (Démarrer direct vers destination)');
+          await Linking.openURL(androidNavigationUrl);
+          return;
+        }
+      } catch (error) {
+        console.log('⚠️ Échec Android navigation intent:', error);
+      }
+
+      // Méthode Android 2: Intent complet avec package explicite
+      try {
+        const canOpenAndroidNavFull = await Linking.canOpenURL(androidNavigationFullUrl);
+        console.log('🤖 Test Android navigation intent (full):', { canOpen: canOpenAndroidNavFull, url: androidNavigationFullUrl });
+        
+        if (canOpenAndroidNavFull) {
+          console.log('✅ Ouverture via Android navigation intent full (Démarrer direct vers destination)');
+          await Linking.openURL(androidNavigationFullUrl);
+          return;
+        }
+      } catch (error) {
+        console.log('⚠️ Échec Android navigation intent full:', error);
+      }
     }
+    
+    // iOS: Essayer Apple Maps navigation en premier
+    if (Platform.OS === 'ios') {
+      try {
+        const canOpenIOSNav = await Linking.canOpenURL(iosNavigationUrl);
+        console.log('🍎 Test iOS Apple Maps navigation:', { canOpen: canOpenIOSNav, url: iosNavigationUrl });
+        
+        if (canOpenIOSNav) {
+          console.log('✅ Ouverture via Apple Maps navigation');
+          await Linking.openURL(iosNavigationUrl);
+          return;
+        }
+      } catch (error) {
+        console.log('⚠️ Échec iOS Apple Maps navigation:', error);
+      }
+    }
+
+    try {
+      // Méthode 2: Essayer le schéma URL spécifique à Google Maps
+      const canOpenGoogleMapsApp = await Linking.canOpenURL(googleMapsAppUrl);
+      console.log('🔍 Test Google Maps app URL:', { canOpen: canOpenGoogleMapsApp, url: googleMapsAppUrl });
+      
+      if (canOpenGoogleMapsApp) {
+        console.log('✅ Ouverture via Google Maps app URL');
+        await Linking.openURL(googleMapsAppUrl);
+        return;
+      }
+    } catch (error) {
+      console.log('⚠️ Échec Google Maps app URL:', error);
+    }
+
+    try {
+      // Méthode 3: Essayer l'URL standard Google Maps
+      const canOpenMaps = await Linking.canOpenURL(mapsAppUrl);
+      console.log('🔍 Test URL standard:', { canOpen: canOpenMaps, url: mapsAppUrl });
+      
+      if (canOpenMaps) {
+        console.log('✅ Ouverture via URL standard');
+        await Linking.openURL(mapsAppUrl);
+        return;
+      }
+    } catch (error) {
+      console.log('⚠️ Échec URL standard:', error);
+    }
+
+    // Méthode 4: Fallback vers le navigateur web
+    console.log('🌐 Fallback vers navigateur web');
+    await Linking.openURL(webUrl);
   } catch (error) {
     console.error('❌ Erreur ouverture Google Maps:', error);
     Alert.alert(
