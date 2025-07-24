@@ -41,10 +41,11 @@ export const updateAccommodation = async (
   try {
     console.log('🏨 updateAccommodation - Début appel API:', {
       accommodationId,
-      accommodationData: {
-        ...accommodationData,
-        thumbnailUri: accommodationData.thumbnailUri ? 'URI fourni' : 'Pas de thumbnail'
-      }
+      accommodationData,
+      accommodationDataKeys: Object.keys(accommodationData),
+      hasThumbnailUri: 'thumbnailUri' in accommodationData,
+      thumbnailUriValue: accommodationData.thumbnailUri,
+      thumbnailUriType: typeof accommodationData.thumbnailUri
     });
 
     // NOUVELLE APPROCHE: Utiliser le même pattern que les steps
@@ -96,11 +97,20 @@ export const updateAccommodation = async (
       return response.data;
       
     } else {
-      // Pas de fichier, utilisation JSON classique (pattern steps)
       console.log('🏨 updateAccommodation - Mise à jour JSON classique (pattern steps)');
       
+      // Préparer les données à envoyer en gérant la suppression de thumbnail
+      const finalData: any = { ...dataFields };
+      
+      if (thumbnailUri === null) {
+        finalData.removeThumbnail = true;
+        console.log('🗑️ updateAccommodation - Flag removeThumbnail ajouté pour suppression');
+      } else if (thumbnailUri !== undefined) {
+        finalData.thumbnailUri = thumbnailUri;
+      }
+      
       // Nettoyer les champs null/undefined
-      const cleanedData = Object.entries(dataFields).reduce((acc, [key, value]) => {
+      const cleanedData = Object.entries(finalData).reduce((acc, [key, value]) => {
         if (value !== null && value !== undefined) {
           acc[key] = value;
         }

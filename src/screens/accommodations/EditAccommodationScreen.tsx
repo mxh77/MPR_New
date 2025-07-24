@@ -103,7 +103,7 @@ export const EditAccommodationScreen: React.FC = () => {
   const { showSuccess } = useToast();
 
   // Hooks métier
-  const { accommodation, loading, error: loadError, refreshAccommodationDetail } = useAccommodationDetail(stepId, accommodationId);
+  const { accommodation, loading, error: loadError, refreshAccommodationDetail, clearAccommodationCache } = useAccommodationDetail(stepId, accommodationId);
   const { updating, error: updateError, updateAccommodationData } = useAccommodationUpdate();
 
   // État du formulaire
@@ -188,15 +188,26 @@ export const EditAccommodationScreen: React.FC = () => {
       setNotes(accommodation.notes || '');
 
       // Gestion de la thumbnail : peut être string ou objet avec { url, type, name, fileId, createdAt }
+      console.log('🖼️ EditAccommodationScreen - Gestion thumbnail lors du remplissage:', {
+        accommodationName: accommodation.name,
+        originalThumbnail: accommodation.thumbnail,
+        originalThumbnailType: typeof accommodation.thumbnail,
+        hasThumbnailProperty: 'thumbnail' in accommodation
+      });
+
       if (accommodation.thumbnail) {
         if (typeof accommodation.thumbnail === 'string') {
+          console.log('🖼️ EditAccommodationScreen - Thumbnail est string:', accommodation.thumbnail);
           setThumbnail(accommodation.thumbnail);
         } else if (accommodation.thumbnail.url) {
+          console.log('🖼️ EditAccommodationScreen - Thumbnail est objet avec URL:', accommodation.thumbnail.url);
           setThumbnail(accommodation.thumbnail.url);
         } else {
+          console.log('🖼️ EditAccommodationScreen - Thumbnail est objet sans URL, suppression');
           setThumbnail(null);
         }
       } else {
+        console.log('🖼️ EditAccommodationScreen - Pas de thumbnail, définition à null');
         setThumbnail(null);
       }
 
@@ -249,10 +260,28 @@ export const EditAccommodationScreen: React.FC = () => {
     const checkInDateTime = buildDateTime(checkInDate, checkInTime);
     const checkOutDateTime = buildDateTime(checkOutDate, checkOutTime);
 
-    console.log('🖼️ EditAccommodationScreen - Thumbnail debug:', {
+    console.log('🖼️ EditAccommodationScreen - Thumbnail debug lors de la sauvegarde:', {
       originalThumbnail: thumbnail,
+      originalAccommodationThumbnail: accommodation?.thumbnail,
       hasThumbnail: !!thumbnail,
-      willUpload: !!thumbnail
+      thumbnailType: typeof thumbnail,
+      willUpload: !!thumbnail,
+      isNull: thumbnail === null,
+      isUndefined: thumbnail === undefined,
+      hadThumbnailBefore: !!(accommodation?.thumbnail)
+    });
+
+    // ✅ DÉTECTER LA SUPPRESSION DE THUMBNAIL
+    const hadThumbnailBefore = !!(accommodation?.thumbnail);
+    const hasThumbnailNow = !!thumbnail;
+    const isRemovingThumbnail = hadThumbnailBefore && !hasThumbnailNow;
+
+    console.log('🗑️ EditAccommodationScreen - Analyse suppression thumbnail:', {
+      hadThumbnailBefore,
+      hasThumbnailNow,
+      isRemovingThumbnail,
+      thumbnailState: thumbnail,
+      originalThumbnail: accommodation?.thumbnail
     });
 
     const accommodationData = {
@@ -272,17 +301,41 @@ export const EditAccommodationScreen: React.FC = () => {
       nights: nights ? parseInt(nights) : null,
       notes: notes.trim() || null,
       thumbnail: thumbnail, // Passer l'URI directement pour upload multipart
+      // ✅ AJOUTER LE FLAG POUR SUPPRESSION
+      ...(isRemovingThumbnail && { removeThumbnail: true })
     };
 
+    console.log('💾 EditAccommodationScreen - Données à sauvegarder:', {
+      accommodationDataKeys: Object.keys(accommodationData),
+      thumbnailInData: accommodationData.thumbnail,
+      thumbnailInDataType: typeof accommodationData.thumbnail,
+      removeThumbnailFlag: (accommodationData as any).removeThumbnail || false
+    });
+
     const result = await updateAccommodationData(stepId, accommodationId, accommodationData);
+
+    console.log('💾 EditAccommodationScreen - Résultat sauvegarde:', {
+      success: !!result,
+      result: result
+    });
 
     if (result) {
       // Sauvegarde locale réussie - Toast succès discret
       showSuccess('Modifications sauvegardées');
       
-      // Notifier le système de rafraîchissement
-      notifyStepUpdate(stepId);
-
+      // SOLUTION ANTI-BOUCLE : Purger complètement le cache puis notifier
+      console.log('🎯 EditAccommodationScreen - Purge cache + notification');
+      
+      // 1. Nettoyer complètement le cache accommodation
+      clearAccommodationCache();
+      
+      // 2. Attendre un délai minimal pour que la sauvegarde soit effective
+      setTimeout(() => {
+        // 3. Notifier le système pour forcer le refresh des écrans
+        console.log('🔔 EditAccommodationScreen - Notification après purge cache');
+        notifyStepUpdate(stepId);
+      }, 200); // Délai minimal pour éviter les races conditions
+      
       // Retourner à l'écran précédent
       navigation.goBack();
     } else {
@@ -293,9 +346,11 @@ export const EditAccommodationScreen: React.FC = () => {
     checkInDate, checkInTime, checkOutDate, checkOutTime,
     phone, notes, thumbnail,
     stepId, accommodationId, updateAccommodationData, updateError,
-    notifyStepUpdate, navigation, buildDateTime,
+    notifyStepUpdate, navigation, buildDateTime, clearAccommodationCache, refreshAccommodationDetail,
     // Champs MongoDB complets
-    email, website, reservationNumber, price, currency, nights
+    email, website, reservationNumber, price, currency, nights,
+    // Ajouter accommodation pour la détection de suppression
+    accommodation
   ]);
 
   // Styles
@@ -627,6 +682,7 @@ export const EditAccommodationScreen: React.FC = () => {
             <ThumbnailPicker
               value={thumbnail}
               onImageSelected={setThumbnail}
+              onImageRemoved={() => setThumbnail(null)}
               label="Photo de l'hébergement"
             />
           </View>

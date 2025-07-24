@@ -55,6 +55,10 @@ const StepDetailScreen: React.FC = () => {
   const route = useRoute();
   const { stepId, roadtripId } = route.params as RouteParams;
 
+  // Protection contre les boucles infinies de refresh
+  const lastRefreshTime = useRef(0);
+  const REFRESH_COOLDOWN = 1000; // 1 seconde de cooldown minimum
+
   // Hook offline-first pour les détails de l'étape
   const {
     step,
@@ -62,7 +66,8 @@ const StepDetailScreen: React.FC = () => {
     syncing,
     error,
     fetchStepDetail,
-    refreshStepDetail
+    refreshStepDetail,
+    forceRefreshStepDetail
   } = useStepDetail(stepId);
 
   // Hook pour la suppression d'étapes
@@ -150,11 +155,27 @@ const StepDetailScreen: React.FC = () => {
    */
   useEffect(() => {
     if (lastStepUpdate > 0 && step && !loading && !syncing) {
-      console.log('🔔 StepDetailScreen - Notification de mise à jour reçue, rafraîchissement LOCAL uniquement');
-      // ✅ CORRECTION: Ne pas forcer la sync API après update local pour éviter d'écraser les nouvelles données
-      refreshStepDetail(false); // false = reload local seulement, pas de sync API
+      const now = Date.now();
+      
+      // Protection contre les appels multiples rapprochés
+      if (now - lastRefreshTime.current < REFRESH_COOLDOWN) {
+        console.log('🔔 StepDetailScreen - Refresh ignoré (cooldown actif):', {
+          timeSinceLastRefresh: now - lastRefreshTime.current,
+          cooldown: REFRESH_COOLDOWN
+        });
+        return;
+      }
+      
+      console.log('🔔 StepDetailScreen - Notification de mise à jour reçue, rechargement sécurisé');
+      
+      // Mettre à jour le timestamp de dernier refresh
+      lastRefreshTime.current = now;
+      
+      // ✅ PROTECTION ANTI-BOUCLE: Utiliser refreshStepDetail au lieu de forceRefreshStepDetail
+      // forceRefreshStepDetail cause une sync API qui retrigger la notification
+      refreshStepDetail(false); // false = rechargement local uniquement, pas de sync API
     }
-  }, [lastStepUpdate]); // Dépendance uniquement sur le timestamp
+  }, [lastStepUpdate, refreshStepDetail]); // Dépendance uniquement sur le timestamp
 
   /**
    * Gestionnaire de suppression d'étape avec confirmation

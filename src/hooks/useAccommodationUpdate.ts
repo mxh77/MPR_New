@@ -130,17 +130,32 @@ const updateAccommodationInLocal = async (stepId: string, accommodationId: strin
         console.log('🔧 useAccommodationUpdate - Mise à jour accommodation existant:', {
           accommodationIndex,
           originalData: accommodations[accommodationIndex],
-          newData: accommodationData
+          originalThumbnail: accommodations[accommodationIndex]?.thumbnail,
+          newData: accommodationData,
+          newThumbnail: accommodationData.thumbnail
         });
 
-        accommodations[accommodationIndex] = {
+        // CORRECTIF THUMBNAIL: Si thumbnail est null, supprimer explicitement le champ
+        const updatedAccommodation = {
           ...accommodations[accommodationIndex],
           ...accommodationData,
           _id: accommodationId, // Préserver l'ID MongoDB
           updatedAt: new Date().toISOString()
         };
 
-        console.log('🔧 useAccommodationUpdate - Accommodation mis à jour:', accommodations[accommodationIndex]);
+        // Si thumbnail est null/undefined, supprimer explicitement le champ
+        if (accommodationData.thumbnail === null || accommodationData.thumbnail === undefined) {
+          console.log('🗑️ useAccommodationUpdate - Suppression explicite thumbnail');
+          delete updatedAccommodation.thumbnail;
+        }
+
+        accommodations[accommodationIndex] = updatedAccommodation;
+
+        console.log('🔧 useAccommodationUpdate - Accommodation mis à jour:', {
+          accommodation: accommodations[accommodationIndex],
+          hasThumbnail: 'thumbnail' in accommodations[accommodationIndex],
+          thumbnailValue: accommodations[accommodationIndex]?.thumbnail
+        });
       }
 
       const finalAccommodationIndex = accommodationIndex === -1 ? accommodations.length - 1 : accommodationIndex;
@@ -215,7 +230,7 @@ const syncAccommodationWithAPI = async (accommodationId: string, accommodationDa
       rating: accommodationData.rating,
       url: accommodationData.url,
       notes: accommodationData.notes,
-      thumbnailUri: accommodationData.thumbnail, // Passer l'URI comme thumbnailUri pour l'upload
+      thumbnailUri: accommodationData.thumbnail, // CORRECTION: Passer thumbnail comme thumbnailUri
     };
 
     console.log('🔄 useAccommodationUpdate - Données à envoyer à l\'API accommodation:', {

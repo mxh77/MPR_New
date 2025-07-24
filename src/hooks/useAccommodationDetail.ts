@@ -7,12 +7,14 @@ import { useState, useCallback, useEffect } from 'react';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../services/database';
 import StepModel from '../services/database/models/Step';
+import { getStepById } from '../services/api';
 
 interface UseAccommodationDetailResult {
   accommodation: any | null;
   loading: boolean;
   error: string | null;
   refreshAccommodationDetail: (forceSync?: boolean) => Promise<void>;
+  clearAccommodationCache: () => void;
 }
 
 /**
@@ -62,6 +64,44 @@ export const useAccommodationDetail = (stepId: string, accommodationId: string):
         stepId,
         accommodationId
       });
+
+      // Si forceSync est true, synchroniser avec l'API d'abord
+      if (forceSync) {
+        console.log('🔄 useAccommodationDetail - Synchronisation forcée avec API');
+        try {
+          const apiStep = await getStepById(stepId);
+          console.log('📡 useAccommodationDetail - Step API récupéré:', {
+            stepId: apiStep._id,
+            stepName: apiStep.name,
+            accommodationsCount: apiStep.accommodations?.length || 0,
+            accommodationsData: apiStep.accommodations
+          });
+
+          // Mettre à jour le step local avec les données API fraîches
+          const stepsCollection = database.get<StepModel>('steps');
+          await database.write(async () => {
+            const localStep = await stepsCollection.find(stepId);
+            await localStep.update((step: any) => {
+              // Mettre à jour les accommodations JSON avec les données API
+              const accommodationsJson = JSON.stringify(apiStep.accommodations || []);
+              console.log('🔄 useAccommodationDetail - Mise à jour avec JSON API:', {
+                accommodationsLength: accommodationsJson.length,
+                accommodationsCount: apiStep.accommodations?.length || 0
+              });
+              
+              step._setRaw('accommodationsJson', accommodationsJson);
+              step._setRaw('sync_status', 'synced');
+              step._setRaw('last_sync_at', Date.now());
+              step._setRaw('updated_at', Date.now());
+            });
+          });
+          console.log('✅ useAccommodationDetail - Step local mis à jour avec données API fraîches');
+        } catch (apiError) {
+          console.warn('⚠️ useAccommodationDetail - Erreur sync API, fallback sur données locales:', apiError);
+          // En cas d'erreur API, on continue avec les données locales mais on nettoie le cache
+          setAccommodation(null);
+        }
+      }
 
       const stepsCollection = database.get<StepModel>('steps');
       const step = await stepsCollection.find(stepId);
@@ -130,7 +170,10 @@ export const useAccommodationDetail = (stepId: string, accommodationId: string):
 
       console.log('✅ useAccommodationDetail - Accommodation trouvé:', {
         name: targetAccommodation.name,
-        id: targetAccommodation._id
+        id: targetAccommodation._id,
+        thumbnail: targetAccommodation.thumbnail,
+        hasThumbnailProperty: 'thumbnail' in targetAccommodation,
+        thumbnailType: typeof targetAccommodation.thumbnail
       });
 
       setAccommodation(targetAccommodation);
@@ -157,10 +200,20 @@ export const useAccommodationDetail = (stepId: string, accommodationId: string):
   //   }
   // }, [stepId, accommodationId, accommodation, loading, refreshAccommodationDetail]);
 
+  /**
+   * Nettoyer le cache de l'accommodation (utile après suppression de thumbnail)
+   */
+  const clearAccommodationCache = useCallback(() => {
+    console.log('🧹 useAccommodationDetail - Nettoyage du cache accommodation');
+    setAccommodation(null);
+    setError(null);
+  }, []);
+
   return {
     accommodation,
     loading,
     error,
     refreshAccommodationDetail,
+    clearAccommodationCache,
   };
 };

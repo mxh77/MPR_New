@@ -16,7 +16,8 @@ interface UseStepDetailResult {
   syncing: boolean;
   error: string | null;
   fetchStepDetail: () => Promise<void>;
-  refreshStepDetail: (forceSync?: boolean) => Promise<void>;
+  refreshStepDetail: (forceSync?: boolean, forceUpdate?: boolean) => Promise<void>;
+  forceRefreshStepDetail: () => Promise<void>;
 }
 
 /**
@@ -189,7 +190,7 @@ const convertStepModelToStep = (stepModel: StepModel): Step => {
 /**
  * Sauvegarde les détails d'une étape en local
  */
-const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
+const saveStepDetailToLocal = async (apiStep: ApiStep, forceUpdate: boolean = false): Promise<void> => {
   // Debug userId avant sauvegarde
   console.log('💾 saveStepDetailToLocal - userId API:', {
     userId: apiStep.userId,
@@ -197,7 +198,8 @@ const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
     stepIdType: typeof apiStep._id,
     stepIdLength: apiStep._id?.length,
     stepName: apiStep.name,
-    roadtripId: apiStep.roadtripId
+    roadtripId: apiStep.roadtripId,
+    forceUpdate
   });
 
   await database.write(async () => {
@@ -206,6 +208,37 @@ const saveStepDetailToLocal = async (apiStep: ApiStep): Promise<void> => {
     try {
       // Chercher l'étape existante
       const existingStep = await stepsCollection.find(apiStep._id);
+      
+      // PROTECTION: Vérifier si les données locales sont plus récentes que les données API
+      // SAUF si forceUpdate est true (ex: après suppression de thumbnail)
+      const localUpdatedAt = existingStep.updatedAt || 0;
+      const currentTime = Date.now();
+      const timeSinceLocalUpdate = currentTime - localUpdatedAt;
+      
+      // Si les données locales ont été modifiées il y a moins de 5 minutes, 
+      // ne pas les écraser avec les données API potentiellement obsolètes
+      // SAUF si forceUpdate est demandé
+      if (!forceUpdate && timeSinceLocalUpdate < 5 * 60 * 1000) { // 5 minutes
+        console.log('⏰ saveStepDetailToLocal - Données locales récentes détectées, éviter écrasement:', {
+          stepName: apiStep.name,
+          localUpdatedAt: new Date(localUpdatedAt).toISOString(),
+          timeSinceLocalUpdate: `${Math.round(timeSinceLocalUpdate / 1000)}s`,
+          reason: 'Données locales récentes préservées'
+        });
+        
+        // Mettre à jour seulement le statut de sync, pas les données sensibles
+        await existingStep.update((step: StepModel) => {
+          step._setRaw('last_sync_at', Date.now());
+          // Ne pas toucher aux accommodations/activities qui peuvent contenir des modifications récentes
+        });
+        
+        console.log('✅ useStepDetail - Sync status mis à jour, données locales préservées');
+        return;
+      }
+      
+      if (forceUpdate) {
+        console.log('🔄 saveStepDetailToLocal - Mise à jour forcée demandée, mise à jour des données');
+      }
       
       // Préparer les données avant la closure
       const rawData = {
@@ -469,8 +502,8 @@ export const useStepDetail = (stepId: string): UseStepDetailResult => {
   /**
    * Fonction de rafraîchissement avec sync forcée
    */
-  const refreshStepDetail = useCallback(async (forceSync: boolean = false) => {
-    console.log('🔄 useStepDetail - refreshStepDetail, forceSync:', forceSync);
+  const refreshStepDetail = useCallback(async (forceSync: boolean = false, forceUpdate: boolean = false) => {
+    console.log('🔄 useStepDetail - refreshStepDetail:', { forceSync, forceUpdate });
     
     if (!stepId) return;
 
@@ -508,10 +541,12 @@ export const useStepDetail = (stepId: string): UseStepDetailResult => {
             userId: apiStep.userId,
             roadtripId: apiStep.roadtripId,
             activitiesCount: apiStep.activities?.length || 0,
-            accommodationsCount: apiStep.accommodations?.length || 0
+            accommodationsCount: apiStep.accommodations?.length || 0,
+            thumbnail: apiStep.thumbnail
           });
-          // Sauvegarder en local
-          await saveStepDetailToLocal(apiStep);
+          
+          // Sauvegarder en local avec force update si demandé
+          await saveStepDetailToLocal(apiStep, forceUpdate);
 
           // Convertir et mettre à jour l'état
           const convertedStep = convertApiStepToStep(apiStep);
@@ -538,6 +573,15 @@ export const useStepDetail = (stepId: string): UseStepDetailResult => {
   //   stepName: step?.title
   // });
 
+  /**
+   * Fonction de rafraîchissement forcé avec bypass de la protection
+   * Utilisée après des opérations critiques comme la suppression de thumbnail
+   */
+  const forceRefreshStepDetail = useCallback(async () => {
+    console.log('🚀 useStepDetail - forceRefreshStepDetail - Bypass protection');
+    await refreshStepDetail(true, true); // forceSync=true, forceUpdate=true
+  }, [refreshStepDetail]);
+
   return {
     step,
     loading,
@@ -545,6 +589,7 @@ export const useStepDetail = (stepId: string): UseStepDetailResult => {
     error,
     fetchStepDetail,
     refreshStepDetail,
+    forceRefreshStepDetail, // Nouvelle fonction pour bypass
   };
 };
 

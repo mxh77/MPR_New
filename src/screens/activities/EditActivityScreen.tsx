@@ -23,7 +23,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme, useDataRefresh, useToast } from '../../contexts';
 import { useActivityDetail } from '../../hooks/useActivityDetail';
-import { useActivityUpdate_new } from '../../hooks/useActivityUpdate';
+import { useActivityUpdate } from '../../hooks/useActivityUpdate';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { parseISODate } from '../../utils';
 import { colors } from '../../constants/colors';
@@ -153,7 +153,7 @@ ActivityTypeSelector.displayName = 'ActivityTypeSelector';
 // COMPOSANT PRINCIPAL
 // ==========================================
 
-export const EditActivityScreen_new: React.FC = () => {
+export const EditActivityScreen: React.FC = () => {
   const navigation = useNavigation<EditActivityScreenNavigationProp>();
   const route = useRoute();
   const { stepId, activityId } = route.params as RouteParams;
@@ -163,8 +163,8 @@ export const EditActivityScreen_new: React.FC = () => {
   const { showSuccess } = useToast();
 
   // Hooks métier
-  const { activity, loading, error: loadError, refreshActivityDetail } = useActivityDetail(stepId, activityId);
-  const { updating, error: updateError, updateActivityData } = useActivityUpdate_new();
+  const { activity, loading, error: loadError, refreshActivityDetail, clearActivityCache } = useActivityDetail(stepId, activityId);
+  const { updating, error: updateError, updateActivityData } = useActivityUpdate();
 
   // État du formulaire - Basé sur le modèle backend Activity
   const [name, setName] = useState('');
@@ -195,7 +195,7 @@ export const EditActivityScreen_new: React.FC = () => {
    */
   useFocusEffect(
     useCallback(() => {
-      console.log('🚶 EditActivityScreen_new - useFocusEffect déclenché:', {
+      console.log('🚶 EditActivityScreen - useFocusEffect déclenché:', {
         hasActivity: !!activity,
         loading,
         error: !!loadError
@@ -203,10 +203,10 @@ export const EditActivityScreen_new: React.FC = () => {
 
       // Conditions strictes pour éviter les appels multiples
       if (!activity && !loading && !loadError) {
-        console.log('🔧 EditActivityScreen_new - Chargement initial des détails');
+        console.log('🔧 EditActivityScreen - Chargement initial des détails');
         refreshActivityDetail();
       } else {
-        console.log('🔧 EditActivityScreen_new - Chargement ignoré:', {
+        console.log('🔧 EditActivityScreen - Chargement ignoré:', {
           hasActivity: !!activity,
           loading,
           hasError: !!loadError,
@@ -221,7 +221,7 @@ export const EditActivityScreen_new: React.FC = () => {
    */
   useEffect(() => {
     if (activity) {
-      console.log('🚶 EditActivityScreen_new - Remplissage du formulaire:', activity.name);
+      console.log('🚶 EditActivityScreen - Remplissage du formulaire:', activity.name);
 
       setName(activity.name || '');
       setType(activity.type || 'Randonnée');
@@ -282,7 +282,7 @@ export const EditActivityScreen_new: React.FC = () => {
    * Gestion de la sélection d'adresse via Google Places
    */
   const handlePlaceSelected = useCallback((place: any) => {
-    console.log('📍 EditActivityScreen_new - Lieu sélectionné:', place.description);
+    console.log('📍 EditActivityScreen - Lieu sélectionné:', place.description);
 
     setAddress(place.description);
 
@@ -311,16 +311,34 @@ export const EditActivityScreen_new: React.FC = () => {
       return;
     }
 
-    console.log('💾 EditActivityScreen_new - Début sauvegarde');
+    console.log('💾 EditActivityScreen - Début sauvegarde');
 
     // Construction des données à sauvegarder
     const startDateTime = buildDateTime(startDate, startTime);
     const endDateTime = buildDateTime(endDate, endTime);
 
-    console.log('🖼️ EditActivityScreen_new - Thumbnail debug:', {
+    console.log('🖼️ EditActivityScreen - Thumbnail debug lors de la sauvegarde:', {
       originalThumbnail: thumbnail,
+      originalActivityThumbnail: activity?.thumbnail,
       hasThumbnail: !!thumbnail,
-      willUpload: !!thumbnail
+      thumbnailType: typeof thumbnail,
+      willUpload: !!thumbnail,
+      isNull: thumbnail === null,
+      isUndefined: thumbnail === undefined,
+      hadThumbnailBefore: !!(activity?.thumbnail)
+    });
+
+    // ✅ DÉTECTER LA SUPPRESSION DE THUMBNAIL
+    const hadThumbnailBefore = !!(activity?.thumbnail);
+    const hasThumbnailNow = !!thumbnail;
+    const isRemovingThumbnail = hadThumbnailBefore && !hasThumbnailNow;
+
+    console.log('🗑️ EditActivityScreen - Analyse suppression thumbnail:', {
+      hadThumbnailBefore,
+      hasThumbnailNow,
+      isRemovingThumbnail,
+      thumbnailState: thumbnail,
+      originalThumbnail: activity?.thumbnail
     });
 
     const activityData = {
@@ -344,20 +362,41 @@ export const EditActivityScreen_new: React.FC = () => {
       trailType: trailType.trim() || null,
       notes: notes.trim() || null,
       thumbnail: thumbnail, // Passer l'URI directement pour upload multipart
+      // ✅ AJOUTER LE FLAG POUR SUPPRESSION
+      ...(isRemovingThumbnail && { removeThumbnail: true })
     };
 
+    console.log('💾 EditActivityScreen - Données à sauvegarder:', {
+      activityDataKeys: Object.keys(activityData),
+      thumbnailInData: activityData.thumbnail,
+      thumbnailInDataType: typeof activityData.thumbnail,
+      removeThumbnailFlag: (activityData as any).removeThumbnail || false
+    });
+
     const result = await updateActivityData(stepId, activityId, activityData);
+
+    console.log('💾 EditActivityScreen - Résultat sauvegarde:', {
+      success: !!result,
+      result: result
+    });
 
     if (result) {
       // Sauvegarde locale réussie - Toast succès discret
       showSuccess('Modifications sauvegardées');
       
-      // Rafraîchir les données locales pour mettre à jour l'affichage (notamment thumbnail)
-      await refreshActivityDetail(true);
+      // SOLUTION ANTI-BOUCLE : Purger complètement le cache puis notifier
+      console.log('🎯 EditActivityScreen - Purge cache + notification');
       
-      // Notifier le système de rafraîchissement
-      notifyStepUpdate(stepId);
-
+      // 1. Nettoyer complètement le cache activity
+      clearActivityCache();
+      
+      // 2. Attendre un délai minimal pour que la sauvegarde soit effective
+      setTimeout(() => {
+        // 3. Notifier le système pour forcer le refresh des écrans
+        console.log('🔔 EditActivityScreen - Notification après purge cache');
+        notifyStepUpdate(stepId);
+      }, 200); // Délai minimal pour éviter les races conditions
+      
       // Retourner à l'écran précédent
       navigation.goBack();
     } else {
@@ -368,10 +407,12 @@ export const EditActivityScreen_new: React.FC = () => {
     startDate, startTime, endDate, endTime,
     phone, notes, thumbnail,
     stepId, activityId, updateActivityData, updateError,
-    notifyStepUpdate, navigation, buildDateTime, refreshActivityDetail, showSuccess,
+    notifyStepUpdate, navigation, buildDateTime, clearActivityCache, showSuccess,
     // Champs MongoDB complets spécifiques aux activités
     email, website, reservationNumber, price, currency, duration, typeDuration,
-    trailDistance, trailElevation, trailType
+    trailDistance, trailElevation, trailType,
+    // Ajouter activity pour la détection de suppression
+    activity
   ]);
 
   // Styles
@@ -775,6 +816,7 @@ export const EditActivityScreen_new: React.FC = () => {
             <ThumbnailPicker
               value={thumbnail}
               onImageSelected={setThumbnail}
+              onImageRemoved={() => setThumbnail(null)}
               label="Photo de l'activité"
             />
           </View>
@@ -1047,4 +1089,4 @@ export const EditActivityScreen_new: React.FC = () => {
   );
 };
 
-export default EditActivityScreen_new;
+export default EditActivityScreen;

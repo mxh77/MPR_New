@@ -218,6 +218,7 @@ const syncActivityWithAPI = async (activityId: string, activityData: any, stepId
             trailType: activityData.trailType,
             notes: activityData.notes,
             thumbnailUri: activityData.thumbnail, // Passer l'URI comme thumbnailUri pour l'upload
+            removeThumbnail: activityData.removeThumbnail, // Flag pour suppression thumbnail
         };
 
         console.log('🔄 useActivityUpdate_new - Données à envoyer à l\'API activité:', {
@@ -473,3 +474,6 @@ export const useActivityUpdate_new = (): UseActivityUpdateResult => {
         updateActivityData,
     };
 };
+
+// Export principal pour cohérence avec useAccommodationUpdate
+export const useActivityUpdate = useActivityUpdate_new;

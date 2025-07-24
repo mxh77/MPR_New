@@ -104,10 +104,22 @@ export const updateActivity = async (
       // Pas de fichier, utilisation JSON classique (pattern steps)
       console.log('🚶 updateActivity - Mise à jour JSON classique (pattern steps)');
       
-      // Nettoyer les champs null/undefined
+      // Nettoyer les champs null/undefined SAUF pour thumbnail qui doit être traité spécialement
       const cleanedData = Object.entries(dataFields).reduce((acc, [key, value]) => {
-        if (value !== null && value !== undefined) {
-          acc[key] = value;
+        if (key === 'thumbnailUri') {
+          // Cas spécial pour thumbnail : null/undefined signifie suppression
+          if (value === null) {
+            acc['removeThumbnail'] = true; // Indiquer à l'API qu'il faut supprimer le thumbnail
+            console.log('🗑️ updateActivity - Demande de suppression thumbnail');
+          } else if (value !== undefined) {
+            acc[key] = value; // Thumbnail fourni normalement
+          }
+          // Si undefined, ne rien faire (pas de changement de thumbnail)
+        } else {
+          // Pour les autres champs, comportement normal
+          if (value !== null && value !== undefined) {
+            acc[key] = value;
+          }
         }
         return acc;
       }, {} as any);

@@ -13,6 +13,7 @@ interface UseActivityDetailResult {
   loading: boolean;
   error: string | null;
   refreshActivityDetail: (forceSync?: boolean) => Promise<void>;
+  clearActivityCache: () => void;
 }
 
 /**
@@ -147,6 +148,16 @@ export const useActivityDetail = (stepId: string, activityId: string): UseActivi
   }, [stepId, activityId, loading]); // Dépendances minimales seulement
 
   /**
+   * Fonction pour purger complètement le cache local de l'activité
+   * Utilisée avant notification pour forcer le refresh de l'UI
+   */
+  const clearActivityCache = useCallback(() => {
+    console.log('🗑️ useActivityDetail - Purge cache activité:', activityId);
+    setActivity(null);
+    setError(null);
+  }, [activityId]);
+
+  /**
    * ❌ DÉSACTIVÉ: Chargement initial automatique pour éviter les doubles appels
    * Le useFocusEffect de l'écran gère le chargement initial
    */
@@ -162,5 +173,6 @@ export const useActivityDetail = (stepId: string, activityId: string): UseActivi
     loading,
     error,
     refreshActivityDetail,
+    clearActivityCache,
   };
 };
