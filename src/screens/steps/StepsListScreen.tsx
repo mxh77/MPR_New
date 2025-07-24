@@ -109,28 +109,7 @@ const StepsListScreen: React.FC = () => {
   };
 
   const handleCreateStep = () => {
-    Alert.alert(
-      'Nouvelle étape',
-      'Choisissez le type d\'étape à créer',
-      [
-        {
-          text: 'Annuler',
-          style: 'cancel',
-        },
-        {
-          text: 'Arrêt',
-          onPress: () => Alert.alert('À implémenter', 'Créer un arrêt - fonctionnalité à venir'),
-        },
-        {
-          text: 'Étape',
-          onPress: () => Alert.alert('À implémenter', 'Créer une étape - fonctionnalité à venir'),
-        },
-        {
-          text: 'Activité',
-          onPress: () => Alert.alert('À implémenter', 'Créer une activité - fonctionnalité à venir'),
-        },
-      ]
-    );
+    navigation.navigate('CreateStep', { roadtripId });
   };
 
   const handleStepPress = (step: Step) => {

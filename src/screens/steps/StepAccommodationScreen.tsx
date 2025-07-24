@@ -17,13 +17,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../contexts';
 import type { Step } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
-import { 
-  getImageUri, 
-  isValidImageUri, 
-  formatItemDate, 
-  hasValidCoordinates, 
-  handleOpenWebsite, 
-  handleOpenMaps 
+import {
+  getImageUri,
+  isValidImageUri,
+  formatItemDate,
+  hasValidCoordinates,
+  handleOpenWebsite,
+  handleOpenMaps
 } from '../../utils/stepDetailHelpers';
 import { SafeImage } from '../../components/common/SafeImage';
 import { stepDetailStyles } from '../../styles/stepDetailStyles';
@@ -133,17 +133,25 @@ export const StepAccommodationScreen: React.FC<StepAccommodationScreenProps> = (
           // Tri par date de début (startDateTime) croissante
           const aDateTime = a.startDateTime || a.arrivalDateTime;
           const bDateTime = b.startDateTime || b.arrivalDateTime;
-          
+
           if (!aDateTime && !bDateTime) return 0;
           if (!aDateTime) return 1; // Mettre les hébergements sans date à la fin
           if (!bDateTime) return -1;
-          
+
           return new Date(aDateTime).getTime() - new Date(bDateTime).getTime();
         })
         .map((accommodation: any, index: number) => (
-          <View key={accommodation._id || index} style={[stepDetailStyles.infoCard, { backgroundColor: theme.colors.surface }]}>
+          <View key={index} style={[stepDetailStyles.itemCard, { backgroundColor: theme.colors.surface }]}>
+            {/* Bouton supprimer en haut à droite de la carte */}
+            <TouchableOpacity
+              style={stepDetailStyles.cardDeleteButton}
+              onPress={() => handleDeleteAccommodation(accommodation)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="trash" size={18} color="white" />
+            </TouchableOpacity>
 
-            {/* Nom de l'accommodation au-dessus du thumbnail - Style identique à l'onglet Infos */}
+            {/* Nom de l'hébergement */}
             <Text style={[stepDetailStyles.title, { color: theme.colors.text }]}>
               {accommodation.name || `Hébergement ${index + 1}`}
             </Text>
@@ -182,14 +190,6 @@ export const StepAccommodationScreen: React.FC<StepAccommodationScreenProps> = (
                       hasAddress={hasAddress}
                       position="top-right"
                     />
-                    {/* Bouton supprimer avec confirmation */}
-                    <TouchableOpacity
-                      style={stepDetailStyles.thumbnailDeleteButton}
-                      onPress={() => handleDeleteAccommodation(accommodation)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="trash" size={18} color="white" />
-                    </TouchableOpacity>
                   </View>
                 );
               } else {
@@ -210,14 +210,6 @@ export const StepAccommodationScreen: React.FC<StepAccommodationScreenProps> = (
                       hasAddress={hasAddress}
                       position="top-right"
                     />
-                    {/* Bouton supprimer pour placeholder */}
-                    <TouchableOpacity
-                      style={stepDetailStyles.thumbnailDeleteButtonPlaceholder}
-                      onPress={() => handleDeleteAccommodation(accommodation)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="trash" size={18} color="white" />
-                    </TouchableOpacity>
                   </View>
                 );
               }

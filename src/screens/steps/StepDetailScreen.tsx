@@ -10,6 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 
 import { useTheme, useDataRefresh } from '../../contexts';
 import { useStepDetail } from '../../hooks/useStepDetail';
+import { useSteps } from '../../hooks/useSteps';
 import type { Step } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
 import { GoogleMap } from '../../components/common';
@@ -47,7 +49,7 @@ interface TabRoute {
 
 const StepDetailScreen: React.FC = () => {
   const { theme } = useTheme();
-  const { lastStepUpdate } = useDataRefresh();
+  const { lastStepUpdate, notifyStepUpdate } = useDataRefresh();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StepDetailScreenNavigationProp>();
   const route = useRoute();
@@ -62,6 +64,9 @@ const StepDetailScreen: React.FC = () => {
     fetchStepDetail,
     refreshStepDetail
   } = useStepDetail(stepId);
+
+  // Hook pour la suppression d'étapes
+  const { deleteStepOptimistic } = useSteps(roadtripId);
 
   // Référence stable pour fetchStepDetail
   const fetchStepDetailRef = useRef(fetchStepDetail);
@@ -152,6 +157,50 @@ const StepDetailScreen: React.FC = () => {
   }, [lastStepUpdate]); // Dépendance uniquement sur le timestamp
 
   /**
+   * Gestionnaire de suppression d'étape avec confirmation
+   */
+  const handleDeleteStep = useCallback(async () => {
+    if (!step) return;
+
+    Alert.alert(
+      'Supprimer l\'étape',
+      `Êtes-vous sûr de vouloir supprimer l'étape "${step.title}" ?\n\nCette action est irréversible.`,
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🗑️ Suppression de l\'étape:', step._id);
+              
+              // Suppression optimiste
+              await deleteStepOptimistic(step._id);
+              
+              // Notifier la mise à jour pour rafraîchir les autres écrans
+              notifyStepUpdate(step._id);
+              
+              // Retourner à l'écran précédent
+              navigation.goBack();
+              
+              console.log('✅ Étape supprimée avec succès');
+            } catch (error) {
+              console.error('❌ Erreur lors de la suppression:', error);
+              Alert.alert(
+                'Erreur',
+                'Impossible de supprimer l\'étape. Veuillez réessayer.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  }, [step, deleteStepOptimistic, notifyStepUpdate, navigation]);
+
+  /**
    * Configuration des scènes pour TabView
    */
   const renderScene = SceneMap({
@@ -229,6 +278,19 @@ const StepDetailScreen: React.FC = () => {
             {step?.type === 'Stage' ? 'Étape' : 'Arrêt'}
           </Text>
         </View>
+
+        {/* Bouton de suppression */}
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDeleteStep}
+          disabled={!step}
+        >
+          <Ionicons 
+            name="trash-outline" 
+            size={24} 
+            color={!step ? 'rgba(255,255,255,0.5)' : theme.colors.white} 
+          />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -390,6 +452,10 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     marginRight: 12,
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 12,
   },
   headerTitle: {
     flex: 1,

@@ -20,6 +20,7 @@ export { RoadtripsListScreen } from './roadtrips/RoadtripsListScreen';
 // Écrans Steps
 export { default as StepsListScreen } from './steps/StepsListScreen';
 export { default as EditStepScreen } from './steps/EditStepScreen';
+export { default as CreateStepScreen } from './steps/CreateStepScreen';
 
 // Écrans Profil
 export { ProfileScreen } from './profile/ProfileScreen';

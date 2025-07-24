@@ -17,12 +17,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTheme } from '../../contexts';
 import type { Step } from '../../types';
 import type { RoadtripsStackParamList } from '../../components/navigation/RoadtripsNavigator';
-import { 
-  getImageUri, 
-  isValidImageUri, 
-  formatItemDate, 
-  hasValidCoordinates, 
-  handleOpenWebsite, 
+import {
+  getImageUri,
+  isValidImageUri,
+  formatItemDate,
+  hasValidCoordinates,
+  handleOpenWebsite,
   handleOpenMaps,
   getActivityTypeLabel
 } from '../../utils/stepDetailHelpers';
@@ -134,17 +134,25 @@ export const StepActivitiesScreen: React.FC<StepActivitiesScreenProps> = ({
           // Tri par date de début (startDateTime) croissante
           const aDateTime = a.startDateTime || a.arrivalDateTime;
           const bDateTime = b.startDateTime || b.arrivalDateTime;
-          
+
           if (!aDateTime && !bDateTime) return 0;
           if (!aDateTime) return 1; // Mettre les activités sans date à la fin
           if (!bDateTime) return -1;
-          
+
           return new Date(aDateTime).getTime() - new Date(bDateTime).getTime();
         })
         .map((activity: any, index: number) => (
-          <View key={activity._id || index} style={[stepDetailStyles.itemCard, { backgroundColor: theme.colors.surface }]}>
+          <View key={index} style={[stepDetailStyles.itemCard, { backgroundColor: theme.colors.surface }]}>
+            {/* Bouton supprimer en haut à droite de la carte */}
+            <TouchableOpacity
+              style={stepDetailStyles.cardDeleteButton}
+              onPress={() => handleDeleteActivity(activity)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="trash" size={18} color="white" />
+            </TouchableOpacity>
 
-            {/* Nom de l'activité au-dessus du thumbnail - Style identique à l'onglet Infos */}
+            {/* Nom de l'activité */}
             <Text style={[stepDetailStyles.title, { color: theme.colors.text }]}>
               {activity.name || `Activité ${index + 1}`}
             </Text>
@@ -183,14 +191,6 @@ export const StepActivitiesScreen: React.FC<StepActivitiesScreenProps> = ({
                       hasAddress={hasAddress}
                       position="top-right"
                     />
-                    {/* Bouton supprimer avec confirmation */}
-                    <TouchableOpacity
-                      style={stepDetailStyles.thumbnailDeleteButton}
-                      onPress={() => handleDeleteActivity(activity)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="trash" size={18} color="white" />
-                    </TouchableOpacity>
                   </View>
                 );
               } else {
@@ -211,14 +211,6 @@ export const StepActivitiesScreen: React.FC<StepActivitiesScreenProps> = ({
                       hasAddress={hasAddress}
                       position="top-right"
                     />
-                    {/* Bouton supprimer pour placeholder */}
-                    <TouchableOpacity
-                      style={stepDetailStyles.thumbnailDeleteButtonPlaceholder}
-                      onPress={() => handleDeleteActivity(activity)}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="trash" size={18} color="white" />
-                    </TouchableOpacity>
                   </View>
                 );
               }

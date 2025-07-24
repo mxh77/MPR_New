@@ -91,7 +91,7 @@ const shouldSynchronizeSteps = async (roadtripId: string): Promise<boolean> => {
 
     // Vérifier la fraîcheur des données (dernière sync il y a plus de 5 minutes)
     const lastStep = localSteps[0];
-    const lastSyncTime = lastStep.lastSyncAt?.getTime() || 0;
+    const lastSyncTime = lastStep.lastSyncAt || 0;
     const now = Date.now();
     const fiveMinutesAgo = now - (5 * 60 * 1000);
 
@@ -254,12 +254,82 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
     try {
       console.log('🌐 API - Début synchronisation pour roadtripId:', roadtripId);
 
-      // Récupération depuis l'API
+      // PHASE 1: Récupération depuis l'API pour vérifier les étapes existantes
       const apiSteps = await getStepsByRoadtrip(roadtripId);
-
       console.log('🌐 API - Étapes récupérées:', apiSteps.length);
+
+      // PHASE 2: Retry intelligent des étapes en attente de synchronisation
+      const stepsCollection = database.get<StepModel>('steps');
+      const pendingSteps = await stepsCollection
+        .query(Q.where('roadtrip_id', roadtripId), Q.where('sync_status', 'pending'))
+        .fetch();
+      
+      if (pendingSteps.length > 0) {
+        console.log('🔄 RETRY - Analyse de', pendingSteps.length, 'étapes en attente');
+        
+        for (const pendingStep of pendingSteps) {
+          try {
+            // Vérifier si cette étape existe déjà côté API (par nom et coordonnées)
+            const existsInAPI = apiSteps.some(apiStep => 
+              apiStep.name === pendingStep.name && 
+              Math.abs(apiStep.latitude - (pendingStep.latitude || 0)) < 0.0001 &&
+              Math.abs(apiStep.longitude - (pendingStep.longitude || 0)) < 0.0001
+            );
+            
+            if (existsInAPI) {
+              console.log('✅ RETRY - Étape déjà existante côté API, marquage comme synchronisée:', pendingStep.name);
+              // Marquer comme synchronisée sans créer
+              await database.write(async () => {
+                await pendingStep.update((s: StepModel) => {
+                  s._setRaw('sync_status', 'synced');
+                  s._setRaw('last_sync_at', Date.now());
+                });
+              });
+              continue;
+            }
+            
+            // Vérifier que toutes les données requises sont présentes
+            if (!pendingStep.name || !pendingStep.address || 
+                pendingStep.latitude === undefined || pendingStep.longitude === undefined ||
+                pendingStep.arrivalDateTime === undefined || pendingStep.departureDateTime === undefined) {
+              console.warn('⚠️ RETRY - Étape incomplète ignorée:', pendingStep.name);
+              continue;
+            }
+            
+            console.log('🔄 RETRY - Création réelle de l\'étape:', pendingStep.name);
+            const stepData: CreateStepRequest = {
+              roadtripId,
+              type: pendingStep.type as 'Stage' | 'Stop',
+              name: pendingStep.name,
+              address: pendingStep.address,
+              latitude: pendingStep.latitude,
+              longitude: pendingStep.longitude,
+              arrivalDateTime: new Date(pendingStep.arrivalDateTime).toISOString(),
+              departureDateTime: new Date(pendingStep.departureDateTime).toISOString(),
+              notes: pendingStep.notes || '',
+            };
+            
+            const apiStep = await createStep(stepData);
+            console.log('✅ RETRY - Étape synchronisée avec succès:', apiStep._id);
+            
+            // Marquer comme synchronisée
+            await database.write(async () => {
+              await pendingStep.update((s: StepModel) => {
+                s._setRaw('sync_status', 'synced');
+                s._setRaw('last_sync_at', Date.now());
+              });
+            });
+            
+          } catch (retryErr) {
+            console.warn('❌ RETRY - Échec retry pour étape:', pendingStep.name, retryErr);
+            // Continuer avec les autres étapes
+          }
+        }
+      }
+
+      // PHASE 3: Utiliser les données API récupérées pour la mise à jour locale
       console.log('🌐 API - ✅ DONNÉES API UTILISÉES (synchronisation)');
-      console.log('🌐 API - Première étape (exemple):', apiSteps[0]._id);
+      console.log('🌐 API - Première étape (exemple):', apiSteps[0]?._id);
 
       // Conversion directe des données API en Steps avec toutes les données
       const convertedSteps = apiSteps
@@ -432,8 +502,14 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
             }
           }
 
-          // Supprimer les steps qui ne sont plus dans l'API
+          // Supprimer les steps qui ne sont plus dans l'API, SAUF ceux en attente de synchronisation
           for (const [stepId, step] of existingStepsMap) {
+            // Ne pas supprimer les steps en attente de synchronisation
+            if (step.customSyncStatus === 'pending') {
+              console.log('🔄 WatermelonDB - Step en attente de sync conservé:', step.name);
+              continue;
+            }
+            
             console.log('🗑️ WatermelonDB - Suppression step obsolète:', step.name);
             await step.markAsDeleted();
           }
@@ -494,6 +570,8 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
         step._setRaw('travel_time_note', 'OK');
         step._setRaw('thumbnail', '');
         step._setRaw('story', '');
+        step._setRaw('activities', JSON.stringify([]));
+        step._setRaw('accommodations', JSON.stringify([]));
         step._setRaw('sync_status', 'pending');
         step._setRaw('last_sync_at', Date.now());
         step._setRaw('created_at', Date.now());
@@ -503,11 +581,17 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
 
     // Synchronisation en arrière-plan
     try {
+      console.log('🔄 CRÉATION - Tentative de synchronisation avec API...');
       const apiStep = await createStep(stepData);
-      await loadLocalSteps();
+      console.log('✅ CRÉATION - Étape créée avec succès sur l\'API:', apiStep._id);
+      
+      // Recharger les données depuis l'API pour obtenir l'ID définitif
+      await refreshSteps(true);
     } catch (err) {
-      console.error('Erreur lors de la création de l\'étape:', err);
+      console.error('❌ CRÉATION - Erreur lors de la création de l\'étape sur l\'API:', err);
       // L'étape reste en local avec le statut 'pending'
+      // Elle sera retentée lors de la prochaine synchronisation
+      console.log('💾 CRÉATION - Étape conservée en local avec statut pending');
     }
 
     return newStep;
@@ -578,13 +662,16 @@ export const useSteps = (roadtripId: string): UseStepsResult => {
 
     // Synchronisation en arrière-plan
     try {
+      console.log('🗑️ deleteStepOptimistic - Suppression API stepId:', stepId);
       await deleteStep(stepId);
+      console.log('✅ deleteStepOptimistic - Suppression API réussie');
     } catch (err) {
-      console.error('Erreur lors de la suppression de l\'étape:', err);
-      // Recharge pour récupérer l'état cohérent
-      await loadLocalSteps();
+      console.error('❌ deleteStepOptimistic - Erreur lors de la suppression API:', err);
+      // Ne pas recharger automatiquement en cas d'erreur API pour préserver la suppression locale
+      // L'utilisateur voit déjà que l'étape est supprimée localement
+      // La suppression sera tentée à nouveau lors de la prochaine synchronisation
     }
-  }, [loadLocalSteps]);
+  }, []);
 
   /**
    * Réorganise les étapes (optimiste)

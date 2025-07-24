@@ -63,27 +63,6 @@ export const StepInfoScreen: React.FC<StepInfoScreenProps> = ({
     });
   }, [step, roadtripId, navigation]);
 
-  /**
-   * Suppression de l'étape
-   */
-  const handleDelete = useCallback(() => {
-    Alert.alert(
-      'Supprimer l\'étape',
-      `Êtes-vous sûr de vouloir supprimer "${step?.title}" ?\n\nCette action est irréversible.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: () => {
-            // TODO: Implémenter la suppression via hook
-            Alert.alert('À implémenter', 'Suppression d\'étape - fonctionnalité à venir');
-          }
-        }
-      ]
-    );
-  }, [step]);
-
   if (!step) {
     return (
       <View style={stepDetailStyles.emptyState}>
@@ -150,14 +129,6 @@ export const StepInfoScreen: React.FC<StepInfoScreenProps> = ({
                   hasAddress={hasAddress}
                   position="top-right"
                 />
-                {/* Bouton supprimer avec confirmation */}
-                <TouchableOpacity
-                  style={stepDetailStyles.thumbnailDeleteButton}
-                  onPress={handleDelete}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="trash" size={18} color="white" />
-                </TouchableOpacity>
               </View>
             );
           } else {
@@ -178,14 +149,6 @@ export const StepInfoScreen: React.FC<StepInfoScreenProps> = ({
                   hasAddress={hasAddress}
                   position="top-right"
                 />
-                {/* Bouton supprimer pour placeholder */}
-                <TouchableOpacity
-                  style={stepDetailStyles.thumbnailDeleteButtonPlaceholder}
-                  onPress={handleDelete}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="trash" size={18} color="white" />
-                </TouchableOpacity>
               </View>
             );
           }

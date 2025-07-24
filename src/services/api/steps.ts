@@ -26,12 +26,6 @@ export interface StepsResponse {
   message?: string;
 }
 
-export interface StepResponse {
-  success: boolean;
-  data: ApiStep;
-  message?: string;
-}
-
 /**
  * Récupère toutes les étapes d'un roadtrip
  */
@@ -79,13 +73,10 @@ export const getStepById = async (stepId: string): Promise<ApiStep> => {
  */
 export const createStep = async (stepData: CreateStepRequest): Promise<ApiStep> => {
   try {
-    const response: AxiosResponse<StepResponse> = await apiClient.post('/steps', stepData);
+    const response: AxiosResponse<ApiStep> = await apiClient.post(`/roadtrips/${stepData.roadtripId}/steps`, stepData);
     
-    if (response.data.success) {
-      return response.data.data;
-    } else {
-      throw new Error(response.data.message || 'Erreur lors de la création de l\'étape');
-    }
+    // L'API retourne directement l'objet step, pas dans une structure wrapper
+    return response.data;
   } catch (error) {
     console.error('Erreur createStep:', error);
     throw error;
@@ -196,16 +187,34 @@ export const updateStep = async (stepId: string, stepData: UpdateStepRequest): P
  */
 export const deleteStep = async (stepId: string): Promise<boolean> => {
   try {
-    const response: AxiosResponse<{ success: boolean; message?: string }> = await apiClient.delete(`/steps/${stepId}`);
+    console.log('🗑️ deleteStep - Suppression stepId:', stepId);
     
-    if (response.data.success) {
+    const response: AxiosResponse<any> = await apiClient.delete(`/steps/${stepId}`);
+    
+    console.log('🗑️ deleteStep - Réponse complète:', {
+      status: response.status,
+      data: response.data,
+      dataType: typeof response.data,
+      hasData: !!response.data,
+      isEmpty: response.data === null || response.data === undefined || response.data === ''
+    });
+    
+    // Considérer comme succès si statut 200, 202, 204
+    if (response.status >= 200 && response.status < 300) {
+      console.log('✅ deleteStep - Suppression réussie (statut HTTP 2xx)');
       return true;
     } else {
-      throw new Error(response.data.message || 'Erreur lors de la suppression de l\'étape');
+      throw new Error(`Erreur HTTP ${response.status}`);
     }
-  } catch (error) {
-    console.error('Erreur deleteStep:', error);
-    throw error;
+  } catch (error: any) {
+    console.error('❌ deleteStep - Erreur:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+      method: error.config?.method
+    });
+    throw new Error(`Échec suppression étape: ${error.message}`);
   }
 };
 

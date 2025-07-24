@@ -617,6 +617,20 @@ export const EditAccommodationScreen: React.FC = () => {
           nestedScrollEnabled={true}
         >
 
+          {/* Section Photo - Déplacée en haut */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              <Ionicons name="image" size={20} color={colors.primary} style={styles.sectionIcon} />
+              Photo
+            </Text>
+
+            <ThumbnailPicker
+              value={thumbnail}
+              onImageSelected={setThumbnail}
+              label="Photo de l'hébergement"
+            />
+          </View>
+
           {/* Section Informations générales */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
@@ -757,19 +771,6 @@ export const EditAccommodationScreen: React.FC = () => {
           </View>
 
           {/* Section Image */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              <Ionicons name="image" size={20} color={colors.primary} style={styles.sectionIcon} />
-              Photo
-            </Text>
-
-            <ThumbnailPicker
-              value={thumbnail}
-              onImageSelected={setThumbnail}
-              label="Photo de l'hébergement"
-            />
-          </View>
-
           {/* Section Notes */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
